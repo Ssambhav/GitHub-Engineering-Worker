@@ -1,0 +1,18 @@
+interface_id: memory.store
+version: 1.0.0
+purpose: Abstract persistence boundary for memory objects, versions, mutations, snapshots, and tombstones.
+capabilities:
+  - persist_object_version
+  - fetch_object_version
+  - list_object_versions
+  - persist_mutation_record
+  - persist_snapshot_manifest
+  - persist_checkpoint_manifest
+  - record_tombstone
+requirements:
+  - Preserve version history according to retention policy.
+  - Never expose secret values directly.
+  - Return structured failures for corruption, missing refs, and permission denial.
+non_responsibilities:
+  - Does not choose what should be remembered.
+  - Does not interpret engineering correctness.

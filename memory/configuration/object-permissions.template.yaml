@@ -1,0 +1,27 @@
+policy_id: memory.permissions.default
+version: 1.0.0
+permissions:
+  issue_summary:
+    read: [orchestrator, issue_understanding, repository_context, planning, review, escalation]
+    write: [issue_understanding]
+  repository_metadata:
+    read: [orchestrator, repository_context, repository_search, planning, validation]
+    write: [repository_context]
+  files_visited:
+    read: [orchestrator, root_cause_analysis, planning, patch_generation, validation]
+    write: [file_reader]
+  files_modified:
+    read: [orchestrator, validation, review, audit_logging, state_management]
+    write: [code_modification]
+  tool_invocations:
+    read: [orchestrator, validation, retry_recovery, audit_logging]
+    write: [tool_framework]
+  workflow_decisions:
+    read: [orchestrator, state_management, audit_logging, review]
+    write: [orchestrator]
+  long_term:
+    read: [orchestrator, memory_management, planning, retry_recovery, review]
+    write: [memory_management]
+delete_authority:
+  default: memory_management
+  audit_linked: policy_authorized_memory_management

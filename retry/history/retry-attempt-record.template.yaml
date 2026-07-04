@@ -1,0 +1,39 @@
+retry_attempt_id: retry-attempt-0001
+workflow_id: workflow-id
+attempt_number: 1
+started_at: timestamp
+completed_at: timestamp
+trigger:
+  failure_ref: artifact-or-event-ref
+  failure_type: Validation Failure
+  failed_stage: Validate
+analysis:
+  failure_analysis_ref: artifact-ref
+  root_cause_summary: bounded summary
+  side_effects_known: true
+strategy:
+  recovery_strategy_id: retry.strategy.patch_revision
+  changed_strategy_summary: bounded summary
+  target_resume_stage: Generate Patch
+context:
+  additional_context_refs: []
+  state_snapshot_ref: state-ref
+  memory_refs: []
+patch:
+  modified_files: []
+  patch_ref: null
+  patch_fingerprint: null
+tooling:
+  tool_invocation_refs: []
+validation:
+  validation_report_refs: []
+  test_report_refs: []
+confidence:
+  before:
+    overall: low
+  after:
+    overall: medium
+outcome:
+  status: success | next_retry | escalated | terminal_failure
+  rationale: bounded summary
+audit_refs: []

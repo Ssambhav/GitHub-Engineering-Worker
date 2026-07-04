@@ -1,0 +1,10 @@
+timeline_id: execution.workflow
+workflow_id: workflow id
+events:
+  - event_ref: event ref
+    stage_id: stage id
+    timestamp: timestamp
+    summary: bounded factual summary
+    memory_refs: []
+    artifact_refs: []
+    audit_refs: []

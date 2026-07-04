@@ -1,0 +1,19 @@
+interface_id: memory.validator
+version: 1.0.0
+purpose: Validate memory object schemas, integrity, duplicates, conflicts, and consistency.
+validation_capabilities:
+  - schema_validation
+  - integrity_check
+  - duplicate_detection
+  - conflict_detection
+  - consistency_validation
+  - corruption_quarantine
+inputs:
+  - memory_object
+  - schema_ref
+  - relationship_refs
+  - policy_refs
+outputs:
+  status: valid | invalid | warning | quarantined
+  validation_errors: []
+  recovery_recommendations: []

@@ -1,0 +1,79 @@
+contract_id: retry.recovery_plan
+contract_version: 1.0.0
+description: Plan for a changed retry attempt after a classified failure.
+type: object
+required:
+  - recovery_plan_id
+  - failure_analysis_ref
+  - changed_strategy
+  - target_resume_stage
+  - validation_requirements
+  - completion_criteria
+fields:
+  recovery_plan_id:
+    type: string
+  workflow_id:
+    type: string
+  failure_analysis_ref:
+    type: string
+  retry_budget:
+    type: object
+    fields:
+      attempt_number:
+        type: integer
+      remaining_total:
+        type: integer
+      remaining_same_failure:
+        type: integer
+  changed_strategy:
+    type: object
+    fields:
+      summary:
+        type: string
+      new_information_required:
+        type: array
+        items: string
+      changed_tool_selection:
+        type: string
+        nullable: true
+      changed_agent_selection:
+        type: string
+        nullable: true
+      prompt_improvement:
+        type: string
+        nullable: true
+      patch_improvement:
+        type: string
+        nullable: true
+      confidence_recalculation:
+        type: string
+  target_resume_stage:
+    type: string
+  context_collection:
+    type: object
+    fields:
+      required_artifacts:
+        type: array
+        items: string
+      owning_agents:
+        type: array
+        items: string
+  repository_safety:
+    type: object
+    fields:
+      base_revision_required:
+        type: boolean
+      cleanup_required:
+        type: boolean
+      approved_file_scope:
+        type: array
+        items: string
+  validation_requirements:
+    type: array
+    items: string
+  completion_criteria:
+    type: array
+    items: string
+  audit_refs:
+    type: array
+    items: string

@@ -1,0 +1,17 @@
+interface_id: retry.failure_analyzer
+interface_version: 1.0.0
+purpose: Produce failure analysis artifacts from failure evidence and policy context.
+operations:
+  analyze_failure:
+    inputs:
+      - failure_event_ref
+      - workflow_state_snapshot_ref
+      - retry_history_refs
+      - policy_refs
+      - confidence_snapshot
+    outputs:
+      - failure_analysis_ref
+      - confidence_impact
+      - retry_recommendation
+    side_effects: none
+    idempotency: idempotent

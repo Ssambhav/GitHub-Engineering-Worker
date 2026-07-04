@@ -1,0 +1,1 @@
+This directory contains daily logs and raw observations of the GitHub Engineering Worker's operations. These files serve as a detailed chronological record, which can be periodically reviewed to update the `MEMORY.md` with long-term insights.

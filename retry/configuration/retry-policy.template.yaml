@@ -1,0 +1,35 @@
+retry:
+  enabled: true
+  max_total_attempts: 3
+  require_changed_strategy: true
+  require_known_side_effects: true
+  require_audit_events: true
+  unknown_failure:
+    max_diagnostic_attempts: 1
+    escalate_if_unclassified: true
+  patch:
+    max_attempts: 2
+    forbid_duplicate_patch_fingerprint: true
+    require_base_revision_match: true
+    require_approved_file_scope: true
+  tool:
+    max_attempts: 2
+    require_idempotency_or_known_side_effects: true
+    allow_alternate_tool_selection: true
+  testing:
+    max_attempts: 2
+    require_failure_classification: true
+    forbid_repeating_same_failed_command_without_change: true
+  network:
+    max_attempts: 3
+    backoff_policy_ref: retry.backoff.exponential_bounded
+  confidence_thresholds:
+    root_cause_minimum_for_patch: medium
+    plan_minimum_for_patch: medium
+    validation_minimum_for_completion: medium
+  escalation:
+    on_budget_exhausted: true
+    on_repeated_identical_failure: true
+    on_repository_safety_risk: true
+    on_state_corruption: true
+    on_human_approval_required: true

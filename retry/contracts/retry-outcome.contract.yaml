@@ -1,0 +1,33 @@
+contract_id: retry.outcome
+contract_version: 1.0.0
+description: Result of a retry attempt or recovery decision.
+type: object
+required:
+  - retry_attempt_ref
+  - status
+  - rationale
+  - evidence_refs
+  - confidence_after
+fields:
+  retry_attempt_ref:
+    type: string
+  status:
+    enum: [success, next_retry, escalated, terminal_failure]
+  rationale:
+    type: string
+  resolved_failure_refs:
+    type: array
+    items: string
+  new_failure_refs:
+    type: array
+    items: string
+  evidence_refs:
+    type: array
+    items: string
+  confidence_after:
+    type: object
+  next_recommended_action:
+    type: string
+  audit_refs:
+    type: array
+    items: string

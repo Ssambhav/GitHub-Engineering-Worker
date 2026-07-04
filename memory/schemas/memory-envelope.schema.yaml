@@ -1,0 +1,97 @@
+schema_id: memory.envelope
+schema_version: 1.0.0
+description: Common envelope composed into every authoritative memory object.
+type: object
+required:
+  - memory_object_id
+  - object_type
+  - schema_version
+  - owner
+  - created_at
+  - updated_at
+  - version
+  - status
+  - sensitivity
+  - retention_class
+  - provenance
+  - validation
+fields:
+  memory_object_id:
+    type: string
+    description: Stable unique object id.
+  object_type:
+    type: string
+    description: Canonical memory object type.
+  schema_version:
+    type: string
+    description: Semantic schema version.
+  workflow_id:
+    type: string
+    nullable: true
+  repository_ref:
+    type: string
+    nullable: true
+  issue_ref:
+    type: string
+    nullable: true
+  owner:
+    type: string
+    description: Owning agent or subsystem.
+  created_at:
+    type: timestamp
+  updated_at:
+    type: timestamp
+  version:
+    type: integer
+    minimum: 1
+  status:
+    enum: [draft, active, superseded, archived, expired, deleted]
+  sensitivity:
+    enum: [public, internal, private, secret_ref]
+  retention_class:
+    enum: [transient, session, workflow, repository, long_term, audit_linked]
+  confidence:
+    type: object
+    fields:
+      level:
+        enum: [high, medium, low, unknown]
+      rationale:
+        type: string
+  provenance:
+    type: object
+    required: [source_refs, created_by]
+    fields:
+      source_refs:
+        type: array
+        items: string
+      created_by:
+        type: string
+      mutation_refs:
+        type: array
+        items: string
+  relationships:
+    type: object
+    fields:
+      parent_refs:
+        type: array
+        items: string
+      child_refs:
+        type: array
+        items: string
+      supersedes_refs:
+        type: array
+        items: string
+      related_refs:
+        type: array
+        items: string
+  validation:
+    type: object
+    required: [schema_valid, integrity_valid]
+    fields:
+      schema_valid:
+        type: boolean
+      integrity_valid:
+        type: boolean
+      last_validated_at:
+        type: timestamp
+        nullable: true

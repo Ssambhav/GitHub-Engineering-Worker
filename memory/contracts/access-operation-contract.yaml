@@ -1,0 +1,34 @@
+contract_id: memory.access_operation.template
+contract_version: 1.0.0
+request:
+  operation_id: string
+  operation: read | write | append | merge | query | snapshot | restore | lock | unlock
+  actor: string
+  workflow_id: string
+  scope:
+    repository_ref: string
+    issue_ref: string
+    object_types: []
+  permissions:
+    requested: []
+  constraints:
+    max_results: integer
+    schema_versions: []
+    consistency: best_effort | checkpoint_consistent | strict
+  audit:
+    required: true
+    sensitivity: normal
+response:
+  operation_id: string
+  status: success | partial | failed | denied | conflict | timed_out
+  object_refs: []
+  versions: []
+  side_effects: []
+  validation:
+    input_validated: boolean
+    output_validated: boolean
+  failure:
+    category: string
+    recoverability: retryable | retry_with_changes | not_retryable | escalate
+    message: string
+  audit_refs: []

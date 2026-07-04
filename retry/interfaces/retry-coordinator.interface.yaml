@@ -1,0 +1,16 @@
+interface_id: retry.coordinator
+interface_version: 1.0.0
+purpose: Evaluate retry eligibility and produce recovery plans for the orchestrator.
+operations:
+  evaluate_retry:
+    inputs:
+      - failure_analysis_ref
+      - retry_history_refs
+      - workflow_state_snapshot_ref
+      - policy_refs
+    outputs:
+      - retry_policy_decision_ref
+      - recovery_plan_ref
+      - target_resume_stage
+    side_effects: audit_metadata_only
+    idempotency: conditionally_idempotent

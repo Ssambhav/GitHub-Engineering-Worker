@@ -1,0 +1,36 @@
+policy_id: memory.default
+version: 1.0.0
+sensitivity:
+  allowed_levels: [public, internal, private, secret_ref]
+  secret_storage: references_only
+retention_defaults:
+  transient: policy_defined_short
+  session: session_end
+  workflow: terminal_plus_policy_window
+  repository: until_repository_invalidation_or_policy_expiry
+  long_term: until_superseded_or_policy_expiry
+  audit_linked: audit_policy
+checkpointing:
+  required_at_stages:
+    - intake
+    - understanding
+    - context
+    - evidence
+    - analysis
+    - plan
+    - patch
+    - modification
+    - validation
+    - decision
+    - terminal
+  pin_versions: true
+compaction:
+  preserve_audit_refs: true
+  preserve_validation_evidence: true
+  preserve_active_checkpoint_refs: true
+promotion:
+  require_terminal_review: true
+  require_human_approval_for_sensitive_memory: true
+deletion:
+  default_mode: tombstone
+  require_audit_ref: true

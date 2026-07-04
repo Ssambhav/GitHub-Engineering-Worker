@@ -1,0 +1,17 @@
+schema_id: memory.relationship
+schema_version: 1.0.0
+description: Relationship and evidence reference template for memory objects.
+relationship_types:
+  parent: Object depends on broader object.
+  child: Object refines or derives from this object.
+  supersedes: Object replaces earlier object version or claim.
+  related: Object is relevant but not dependent.
+  evidence: Object claim is supported by artifact, audit, tool, file, issue, or memory ref.
+reference:
+  ref_id: string
+  ref_type: memory | artifact | audit | tool_invocation | file | issue | state | workflow | external
+  version: string
+  required_for_resume: boolean
+  sensitivity: public | internal | private | secret_ref
+  integrity_hash: string
+  description: string

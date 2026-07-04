@@ -1,0 +1,18 @@
+snapshot_id: snapshot.workflow.sequence
+workflow_id: workflow id
+created_at: timestamp
+created_by: agent or subsystem id
+reason: concise reason for snapshot
+consistency: best_effort | checkpoint_consistent | strict
+object_versions:
+  - object_id: memory object id
+    version: integer
+    object_type: type
+    required_for_restore: true
+excluded_objects:
+  - object_id: memory object id
+    reason: sensitivity | transient | expired | unrelated
+audit_refs: []
+integrity:
+  manifest_hash: hash
+  validation_status: valid | warning | invalid

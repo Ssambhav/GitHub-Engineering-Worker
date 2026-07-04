@@ -1,0 +1,60 @@
+
+# .gitignore
+
+# OpenClaw specific
+.openclaw/history.json
+.openclaw/sessions/
+.openclaw/*.log
+.openclaw/cache/
+/HEARTBEAT.md
+/IDENTITY.md
+/SOUL.md
+/TOOLS.md
+/USER.md
+/openclaw-workspace-state.json
+
+# Dependencies
+/node_modules
+/vendor
+
+# Python
+__pycache__/
+*.pyc
+*.log
+.venv/
+virtualenv/
+
+# Environment variables
+.env
+.env.*
+
+# Logs
+logs/*.log
+
+# Runtime and temporary files
+runtime/cache/*
+runtime/tmp/*
+runtime/sandbox/*
+runtime/artifacts/*
+!runtime/**/README.md
+*.tmp
+*.bak
+
+# State files
+states/*.json
+states/*.yaml
+states/**/*.json
+states/**/*.yaml
+!states/**/README.md
+
+# Memory files that are automatically generated and should not be tracked by git
+memory/daily/*
+!memory/daily/README.md
+
+# IDE-specific files
+.idea/
+.vscode/
+
+# OS generated files
+.DS_Store
+thumbs.db

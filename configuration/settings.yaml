@@ -1,0 +1,44 @@
+# GitHub Engineering Worker global settings.
+# This file is declarative only. Do not store secrets here.
+
+project:
+  name: GitHub Engineering Worker
+  mode: autonomous-engineering-worker
+  environment: ${GEW_ENV:-development}
+
+openclaw:
+  workspace: ${OPENCLAW_WORKSPACE:-.}
+  runtime_dir: runtime
+  state_dir: states
+  memory_dir: memory
+  audit_dir: audit
+
+github:
+  owner: ${GITHUB_OWNER}
+  repository: ${GITHUB_REPOSITORY}
+  token_env: GITHUB_TOKEN
+  default_base_branch: main
+  branch_prefix: gew/
+
+execution:
+  dry_run: true
+  require_human_approval_for:
+    - destructive_git_operations
+    - production_deployments
+    - dependency_major_upgrades
+    - security_sensitive_changes
+  max_parallel_issues: 1
+  max_retry_attempts: 3
+
+observability:
+  log_level: info
+  audit_decisions: true
+  retain_runtime_artifacts: false
+
+policies:
+  security: policies/security/README.md
+  repository: policies/repository/README.md
+  review: policies/review/README.md
+  runtime: policies/runtime/README.md
+  retry: retry/RETRY_POLICY.md
+  failure: retry/FAILURE_POLICY.md

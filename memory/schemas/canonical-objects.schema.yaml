@@ -1,0 +1,231 @@
+schema_id: memory.canonical_objects
+schema_version: 1.0.0
+description: Payload templates for canonical memory object families. Each payload composes memory.envelope.
+objects:
+  issue_summary:
+    owner: Issue Understanding Agent
+    purpose: Normalize issue intent and acceptance criteria.
+    fields:
+      title: string
+      problem_statement: string
+      expected_behavior: string
+      constraints: [string]
+      acceptance_criteria: [string]
+      assumptions: [string]
+      ambiguities:
+        - severity: low | medium | high
+          question: string
+          impact: string
+      linked_refs: [string]
+  repository_metadata:
+    owner: Repository Context Agent
+    purpose: Identify repository, revision, access scope, and project metadata.
+    fields:
+      repository_ref: string
+      workspace_ref: string
+      revision: string
+      default_branch: string
+      languages: [string]
+      manifests: [string]
+      access_scope: string
+      generated_paths: [string]
+  repository_structure:
+    owner: Repository Context Agent
+    purpose: Summarize repository modules, ownership hints, and entry points.
+    fields:
+      directories:
+        - path: string
+          purpose: string
+          confidence: high | medium | low
+      test_entry_points: [string]
+      build_entry_points: [string]
+      documentation_refs: [string]
+      convention_notes: [string]
+  files_visited:
+    owner: File Reader Agent
+    purpose: Track files and line ranges inspected as evidence.
+    fields:
+      files:
+        - path: string
+          ranges: [string]
+          content_hash: string
+          reason: string
+          summary: string
+          follow_up_refs: [string]
+  files_modified:
+    owner: Code Modification Agent
+    purpose: Track applied changes and authorized file modifications.
+    fields:
+      files:
+        - path: string
+          base_hash: string
+          new_hash: string
+          diff_ref: string
+          authorization_ref: string
+          reason: string
+      changed_file_count: integer
+  search_results:
+    owner: Repository Search Agent
+    purpose: Record search queries, ranked results, and gaps.
+    fields:
+      queries:
+        - query: string
+          scope: string
+          result_count: integer
+          ranking_rationale: string
+      results:
+        - path: string
+          line: integer
+          snippet_ref: string
+          relevance: high | medium | low
+      gaps: [string]
+  analysis_results:
+    owner: Root Cause Analysis Agent
+    purpose: Capture hypotheses, evidence maps, and rejected alternatives.
+    fields:
+      hypotheses:
+        - summary: string
+          status: accepted | rejected | open
+          evidence_refs: [string]
+      evidence_map:
+        - claim: string
+          evidence_refs: [string]
+      confidence_rationale: string
+  root_cause:
+    owner: Root Cause Analysis Agent
+    purpose: State cause, affected behavior, and minimal change target.
+    fields:
+      cause: string
+      affected_surface: [string]
+      minimal_change_target: string
+      should_not_change: [string]
+      risks: [string]
+  engineering_plan:
+    owner: Planning Agent
+    purpose: Define implementation and validation strategy.
+    fields:
+      implementation_steps: [string]
+      validation_steps: [string]
+      expected_changed_files: [string]
+      out_of_scope: [string]
+      rollback_notes: [string]
+      acceptance_mapping:
+        - criterion: string
+          plan_step_refs: [string]
+  generated_patch:
+    owner: Patch Generation Agent
+    purpose: Describe proposed edits before application.
+    fields:
+      target_files: [string]
+      edit_intents:
+        - path: string
+          summary: string
+          expected_behavioral_impact: string
+      applicability_constraints: [string]
+  validation_results:
+    owner: Validation Agent
+    purpose: Record validation decision, risks, and acceptance mapping.
+    fields:
+      decision: pass | fail | inconclusive
+      checks:
+        - name: string
+          result: pass | fail | skipped | inconclusive
+          evidence_refs: [string]
+      residual_risks: [string]
+      required_tests: [string]
+  test_results:
+    owner: Test Execution Agent
+    purpose: Record factual command execution results.
+    fields:
+      commands:
+        - command_ref: string
+          exit_code: integer
+          duration_ms: integer
+          result: pass | fail | timed_out | blocked
+          output_ref: string
+          environment_notes: [string]
+  retry_attempts:
+    owner: Retry & Recovery Agent
+    purpose: Track retry decisions and changed strategies.
+    fields:
+      attempts:
+        - attempt_number: integer
+          failure_ref: string
+          changed_strategy: string
+          resume_stage: string
+          outcome: success | failed | escalated | pending
+  failure_reasons:
+    owner: Retry & Recovery Agent
+    purpose: Classify failures and recovery impact.
+    fields:
+      failures:
+        - category: string
+          severity: info | warning | error | critical
+          recoverability: retryable | retry_with_changes | not_retryable | escalate
+          side_effect_refs: [string]
+          prevention_notes: [string]
+  confidence_history:
+    owner: Engineering Orchestrator
+    purpose: Track confidence movement across the workflow.
+    fields:
+      entries:
+        - field: string
+          previous: high | medium | low | unknown
+          current: high | medium | low | unknown
+          reason: string
+          evidence_refs: [string]
+  tool_invocations:
+    owner: Tool Framework
+    purpose: Index tool invocation evidence and retry safety.
+    fields:
+      invocations:
+        - tool_id: string
+          invocation_ref: string
+          side_effects: [string]
+          status: success | partial | failed | cancelled | timed_out | denied
+          retry_safe: boolean
+  workflow_decisions:
+    owner: Engineering Orchestrator
+    purpose: Record transition decisions and rationale.
+    fields:
+      decisions:
+        - decision_id: string
+          inputs: [string]
+          criteria: [string]
+          outcome: string
+          audit_refs: [string]
+  execution_timeline:
+    owner: State Management Agent
+    purpose: Order workflow events, checkpoints, and artifact versions.
+    fields:
+      events:
+        - event_ref: string
+          stage_id: string
+          timestamp: timestamp
+          memory_refs: [string]
+  audit_entries:
+    owner: Audit Logging Agent
+    purpose: Reference audit events related to memory objects.
+    fields:
+      audit_refs:
+        - ref: string
+          event_type: string
+          sensitivity: normal | security_sensitive
+  engineering_review:
+    owner: Review Generation Agent
+    purpose: Preserve final maintainer-facing outcome summary.
+    fields:
+      summary: string
+      changed_files: [string]
+      validation_summary: string
+      limitations: [string]
+      review_ref: string
+  escalation_summary:
+    owner: Escalation Agent
+    purpose: Preserve blocker and human decision request.
+    fields:
+      blocker: string
+      urgency: low | medium | high
+      human_question: string
+      evidence_refs: [string]
+      recommended_options: [string]

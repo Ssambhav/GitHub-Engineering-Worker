@@ -1,0 +1,41 @@
+contract_id: retry.strategy
+contract_version: 1.0.0
+description: Reusable recovery strategy definition.
+type: object
+required:
+  - strategy_id
+  - strategy_version
+  - applies_to_failure_types
+  - changed_strategy_requirements
+  - forbidden_actions
+  - completion_evidence
+fields:
+  strategy_id:
+    type: string
+  strategy_version:
+    type: string
+  description:
+    type: string
+  applies_to_failure_types:
+    type: array
+    items: string
+  entry_requirements:
+    type: array
+    items: string
+  changed_strategy_requirements:
+    type: array
+    items: string
+  allowed_resume_stages:
+    type: array
+    items: string
+  forbidden_actions:
+    type: array
+    items: string
+  completion_evidence:
+    type: array
+    items: string
+  confidence_effect:
+    type: object
+  audit_requirements:
+    type: array
+    items: string

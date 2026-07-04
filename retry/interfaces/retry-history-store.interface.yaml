@@ -1,0 +1,22 @@
+interface_id: retry.history_store
+interface_version: 1.0.0
+purpose: Persist and query workflow-scoped retry attempt records.
+operations:
+  append_attempt_record:
+    inputs:
+      - retry_attempt_record
+      - workflow_id
+    outputs:
+      - retry_attempt_ref
+      - duplicate_detection_summary
+    side_effects: state_or_artifact_write
+    idempotency: conditionally_idempotent
+  query_attempts:
+    inputs:
+      - workflow_id
+      - filters
+    outputs:
+      - retry_attempt_refs
+      - similarity_summary
+    side_effects: none
+    idempotency: idempotent

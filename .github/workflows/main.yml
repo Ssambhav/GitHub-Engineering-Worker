@@ -1,0 +1,43 @@
+name: Foundation Validation
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  structure:
+    name: Validate repository foundation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure required directories exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          required_dirs=(
+            agents tools workflows states memory policies logs runtime utilities configuration docs audit review retry
+          )
+          for dir in "${required_dirs[@]}"; do
+            test -d "$dir"
+            test -f "$dir/README.md"
+          done
+
+      - name: Ensure no runtime logic is present yet
+        shell: bash
+        run: |
+          set -euo pipefail
+          disallowed=$(find agents tools workflows runtime utilities -type f \
+            ! -name 'README.md' \
+            ! -name '*.md' \
+            ! -name '*.yaml' \
+            ! -name '*.yml' \
+            ! -name '*.json' \
+            -print)
+          if [ -n "$disallowed" ]; then
+            echo "$disallowed"
+            exit 1
+          fi

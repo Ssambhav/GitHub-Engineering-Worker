@@ -1,0 +1,38 @@
+policy_id: retry.global.default
+policy_version: 1.0.0
+description: Default retry limits and invariants for autonomous engineering workflows.
+owner: Retry & Recovery System
+scope:
+  workflow_types: [issue_lifecycle]
+  stages: [any]
+limits:
+  max_total_retries: 3
+  max_same_failure_retries: 1
+  max_unknown_failure_diagnostics: 1
+  max_patch_retries: 2
+  max_tool_retries: 2
+  max_network_retries: 3
+eligibility:
+  requires_changed_strategy: true
+  requires_known_side_effects: true
+  requires_state_integrity: true
+  requires_auditability: true
+  requires_repository_safety: true
+  forbid_identical_patch: true
+  forbid_identical_prompt_without_new_context: true
+  forbid_unvalidated_success: true
+escalation:
+  budget_exhausted: required
+  repeated_identical_failure: required
+  repository_safety_risk: immediate
+  permission_denied: immediate
+  human_approval_required: immediate
+  unknown_failure_after_diagnostic: required
+audit:
+  required_events:
+    - FailureClassified
+    - RecoveryPlanned
+    - RetryStarted
+    - RetryCompleted
+  redact_large_outputs: true
+  store_artifact_refs_only: true

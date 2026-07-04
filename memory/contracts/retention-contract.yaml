@@ -1,0 +1,35 @@
+contract_id: memory.retention.template
+contract_version: 1.0.0
+retention_classes:
+  transient:
+    survives_restart: false
+    checkpoint_eligible: false
+    default_expiry: policy_defined_short
+  session:
+    survives_restart: false
+    checkpoint_eligible: conditional
+    default_expiry: session_end
+  workflow:
+    survives_restart: true
+    checkpoint_eligible: true
+    default_expiry: terminal_plus_policy_window
+  repository:
+    survives_restart: true
+    checkpoint_eligible: true
+    default_expiry: until_repository_invalidation_or_policy_expiry
+  long_term:
+    survives_restart: true
+    checkpoint_eligible: false
+    default_expiry: until_superseded_or_policy_expiry
+  audit_linked:
+    survives_restart: true
+    checkpoint_eligible: true
+    default_expiry: audit_policy
+deletion_modes:
+  tombstone: Keep metadata and remove payload.
+  redact: Remove sensitive fields and preserve safe summary.
+  physical: Remove content when policy permits.
+compaction_requirements:
+  preserve_evidence_refs: true
+  preserve_audit_refs: true
+  preserve_active_checkpoint_refs: true

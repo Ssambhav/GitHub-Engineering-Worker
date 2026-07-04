@@ -1,0 +1,35 @@
+contract_id: memory.object_family.template
+contract_version: 1.0.0
+object_type: replace_with_object_type
+purpose: One sentence explaining why this memory object exists.
+owner: Owning agent or subsystem.
+schema_ref: memory.schemas.replace_with_schema
+lifecycle:
+  created_by: []
+  update_modes: [replace, append, merge, supersede, annotate]
+  terminal_states: [active, superseded, archived, expired, deleted]
+permissions:
+  read: []
+  write: []
+  delete: []
+retention:
+  class: workflow
+  expiry: policy_defined
+  archival: policy_defined
+validation:
+  schema: []
+  integrity: []
+  consistency: []
+relationships:
+  parents: []
+  children: []
+  evidence: []
+compaction:
+  eligible: true
+  rules: []
+promotion:
+  eligible: false
+  target_memory_type: none
+conflict_resolution:
+  resolver: owner | orchestrator | memory_management | escalation
+  rules: []

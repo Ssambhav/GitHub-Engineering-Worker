@@ -1,0 +1,10 @@
+history_id: confidence.workflow
+workflow_id: workflow id
+entries:
+  - field: issue_understanding | repository_context | root_cause | plan | patch | validation | overall
+    previous: high | medium | low | unknown
+    current: high | medium | low | unknown
+    reason: concise reason
+    evidence_refs: []
+    changed_at: timestamp
+    changed_by: agent or subsystem id

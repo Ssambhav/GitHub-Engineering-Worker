@@ -1,0 +1,14 @@
+log_id: memory.mutations.workflow
+workflow_id: workflow id
+entries:
+  - mutation_id: mutation id
+    memory_object_id: object id
+    base_version: integer
+    new_version: integer
+    operation: create | update | append | merge | supersede | archive | expire | delete | restore
+    actor: agent or subsystem id
+    reason: concise reason
+    changed_fields: []
+    source_refs: []
+    audit_refs: []
+    created_at: timestamp

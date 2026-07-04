@@ -1,0 +1,15 @@
+name: GitHub Engineering Worker
+kind: autonomous-engineering-worker
+version: 0.1.0
+description: OpenClaw foundation for autonomous GitHub Issue lifecycle ownership.
+
+entrypoints:
+  agents_dir: agents
+  workflows_dir: workflows
+  tools_dir: tools
+  configuration_dir: configuration
+  runtime_dir: runtime
+
+status:
+  foundation_only: true
+  business_logic_implemented: false

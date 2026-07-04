@@ -1,0 +1,82 @@
+contract_id: retry.failure_analysis
+contract_version: 1.0.0
+description: Structured analysis of a failure and its recovery eligibility.
+type: object
+required:
+  - failure_analysis_id
+  - workflow_id
+  - failure_type
+  - severity
+  - recoverability
+  - root_cause
+  - side_effects
+  - retry_recommendation
+  - confidence_impact
+  - audit_requirements
+fields:
+  failure_analysis_id:
+    type: string
+  workflow_id:
+    type: string
+  worker_type:
+    type: string
+    description: Generic autonomous worker type, e.g. github_engineering_worker.
+  failed_stage:
+    type: string
+  failure_type:
+    type: string
+  severity:
+    enum: [info, warning, error, critical]
+  recoverability:
+    enum: [retryable, retry_with_changes, not_retryable, escalate, terminal]
+  what_failed:
+    type: string
+  why_failed:
+    type: string
+  root_cause:
+    type: object
+    fields:
+      classification:
+        enum: [transient, missing_context, incorrect_hypothesis, plan_error, patch_error, tool_contract, model_output, validation_environment, repository_state, permission, product_decision, unknown]
+      summary:
+        type: string
+      evidence_refs:
+        type: array
+        items: string
+  side_effects:
+    type: object
+    fields:
+      known:
+        type: boolean
+      refs:
+        type: array
+        items: string
+      cleanup_required:
+        type: boolean
+  retry_recommendation:
+    type: object
+    fields:
+      eligible:
+        type: boolean
+      target_resume_stage:
+        type: string
+      required_strategy_changes:
+        type: array
+        items: string
+      escalation_required:
+        type: boolean
+      rationale:
+        type: string
+  confidence_impact:
+    type: object
+    fields:
+      affected_fields:
+        type: array
+        items: string
+      direction:
+        enum: [increase, decrease, unchanged, blocked]
+      rationale:
+        type: string
+  audit_requirements:
+    type: array
+    items: string

@@ -1,0 +1,45 @@
+strategy_id: retry.strategy.template
+strategy_version: 1.0.0
+description: Human-readable recovery strategy description.
+owner: Retry & Recovery System
+applies_to_failure_types: []
+recoverability_required:
+  - retryable
+  - retry_with_changes
+entry_requirements:
+  - failure_analysis_ref
+  - retry_budget_available
+  - state_integrity_confirmed
+  - side_effects_known
+changed_strategy_requirements:
+  context: optional
+  tool: optional
+  agent: optional
+  prompt: optional
+  patch: optional
+  validation: optional
+  checkpoint: optional
+target_resume_stage:
+  allowed_values:
+    - Collect Context
+    - Repository Search
+    - Read Relevant Files
+    - Analyze Root Cause
+    - Create Engineering Plan
+    - Generate Patch
+    - Apply Changes
+    - Validate
+    - Run Tests
+forbidden_actions:
+  - repeat_identical_attempt
+  - bypass_validation
+  - modify_unrelated_files
+  - ignore_side_effects
+completion_evidence:
+  - recovery_plan_ref
+  - retry_attempt_ref
+  - validation_or_escalation_ref
+audit_requirements:
+  - record_strategy_selection
+  - record_strategy_change_basis
+  - record_completion_outcome

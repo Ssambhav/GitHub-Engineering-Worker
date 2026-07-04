@@ -1,0 +1,37 @@
+checkpoint_id: checkpoint.workflow.stage.sequence
+checkpoint_type: intake | understanding | context | evidence | analysis | plan | patch | modification | validation | decision | terminal | custom
+workflow_id: workflow id
+stage_id: stage id
+created_at: timestamp
+created_by: State Management Agent
+repository:
+  repository_ref: owner/repo
+  workspace_ref: workspace ref
+  revision: commit or content hash
+issue_ref: provider issue ref
+memory_refs:
+  - object_id: memory object id
+    version: integer
+    required_for_resume: true
+artifact_refs: []
+confidence_snapshot:
+  issue_understanding: unknown
+  repository_context: unknown
+  root_cause: unknown
+  plan: unknown
+  patch: unknown
+  validation: unknown
+  overall: unknown
+retry:
+  count: 0
+  last_failure_ref: null
+tool_invocation_refs: []
+audit_refs: []
+locks:
+  held: []
+  released: []
+  cleanup_required: []
+restore:
+  resume_stage: stage id
+  partial_restore_allowed: true
+  stale_ref_policy: refresh | quarantine | escalate

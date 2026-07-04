@@ -1,0 +1,35 @@
+schema_id: memory.mutation
+schema_version: 1.0.0
+description: Record of a memory object mutation.
+type: object
+required:
+  - mutation_id
+  - memory_object_id
+  - base_version
+  - new_version
+  - operation
+  - actor
+  - reason
+  - created_at
+fields:
+  mutation_id: string
+  memory_object_id: string
+  base_version: integer
+  new_version: integer
+  operation:
+    enum: [create, update, append, merge, supersede, archive, expire, delete, restore]
+  actor: string
+  reason: string
+  changed_fields:
+    type: array
+    items: string
+  source_refs:
+    type: array
+    items: string
+  audit_refs:
+    type: array
+    items: string
+  created_at: timestamp
+  idempotency_key:
+    type: string
+    nullable: true

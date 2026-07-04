@@ -1,0 +1,21 @@
+interface_id: memory.service
+version: 1.0.0
+purpose: Coordinate memory operations across object schemas, permissions, validation, persistence, and audit.
+operations:
+  - read
+  - write
+  - append
+  - merge
+  - query
+  - snapshot
+  - restore
+  - lock
+  - unlock
+inputs:
+  contract_ref: memory.contracts.access_operation
+outputs:
+  contract_ref: memory.contracts.access_operation
+non_responsibilities:
+  - Does not make workflow transition decisions.
+  - Does not implement storage engine behavior in this specification.
+  - Does not execute agents or tools.

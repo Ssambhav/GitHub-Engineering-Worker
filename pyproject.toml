@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "github-engineering-worker"
+version = "0.1.0"
+description = "Runtime core for the GitHub Engineering Worker autonomous engineering platform."
+requires-python = ">=3.12"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "GitHub Engineering Worker Contributors" }]
+
+[tool.setuptools.packages.find]
+include = ["runtime*", "agents*", "tools*"]

@@ -1,0 +1,20 @@
+interface_id: memory.query
+version: 1.0.0
+purpose: Query memory by type, scope, relationship, confidence, lifecycle state, and evidence refs.
+query_dimensions:
+  - object_type
+  - workflow_id
+  - repository_ref
+  - issue_ref
+  - owner
+  - status
+  - retention_class
+  - confidence_level
+  - relationship_ref
+  - evidence_ref
+  - created_at
+  - updated_at
+result_requirements:
+  - Results must be bounded.
+  - Results must include object id, version, type, owner, confidence, sensitivity, and provenance summary.
+  - Sensitive payloads require explicit read permission.
