@@ -1,0 +1,11 @@
+Repository -> Issue -> Three failed attempts -> Confidence drops -> Escalation
+
+1. Repository owner/repo is configured.
+2. Issue #77 is detected.
+3. Patch generation or validation fails.
+4. Worker retries with bounded attempts.
+5. Failure repeats three times.
+6. Confidence drops below threshold.
+7. Worker escalates instead of opening a pull request.
+8. Audit and report are persisted.
+9. Discord receives an escalation notification when enabled.

@@ -1,0 +1,22 @@
+{
+  "username": "GitHub Engineering Worker",
+  "embeds": [
+    {
+      "title": "Pull Request Created",
+      "description": "your-org/your-repo#42 completed on branch `gew/issue-42-fix-login-error`.",
+      "color": 2664261,
+      "fields": [
+        {
+          "name": "confidence",
+          "value": "86.4",
+          "inline": true
+        },
+        {
+          "name": "commit",
+          "value": "abc123",
+          "inline": true
+        }
+      ]
+    }
+  ]
+}

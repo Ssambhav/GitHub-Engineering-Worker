@@ -1,0 +1,26 @@
+{
+  "execution_id": "worker_your-org_your-repo_42",
+  "issue_summary": "Fix login error when session expires",
+  "repository": "your-org/your-repo",
+  "root_cause": "Expired session lookup was treated as an authenticated session.",
+  "files_read": [
+    "src/auth/session.py",
+    "tests/test_session.py"
+  ],
+  "files_modified": [
+    "src/auth/session.py",
+    "tests/test_session.py"
+  ],
+  "patch_summary": "Added an expired-session guard and regression test.",
+  "validation": "passed",
+  "tests": [
+    "pytest tests/test_session.py"
+  ],
+  "confidence": {
+    "overall": 86.4,
+    "band": "high",
+    "decision": "proceed"
+  },
+  "final_decision": "create_pull_request",
+  "next_recommendation": "maintainer_review"
+}

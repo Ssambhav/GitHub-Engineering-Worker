@@ -1,0 +1,12 @@
+Repository -> Issue -> Worker -> Patch -> Tests -> Pull Request
+
+1. Repository owner/repo is configured.
+2. Issue #42 is detected by the watcher.
+3. Worker clones or refreshes the repository.
+4. Engineering pipeline generates and applies a patch.
+5. Tests pass.
+6. Confidence is above threshold.
+7. Worker creates a feature branch and commit.
+8. Worker pushes the branch and opens a pull request.
+9. Audit and report are persisted.
+10. Discord receives a success notification when enabled.

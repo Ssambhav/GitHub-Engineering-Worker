@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping, Protocol
 
+from runtime.configuration import RuntimeConfiguration
 from runtime.events import InMemoryEventBus
 from runtime.interfaces import StructuredLogger
 from runtime.registry import RuntimeRegistry
@@ -54,5 +55,6 @@ class RuntimeServices:
 
     registry: RuntimeRegistry | None = None
     event_bus: InMemoryEventBus | None = None
+    configuration: RuntimeConfiguration | None = None
     memory: MemoryAccess = NullMemoryAccess()
     logger: StructuredLogger = NullStructuredLogger()

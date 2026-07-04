@@ -1,0 +1,16 @@
+discord:
+  enabled: false
+  webhook_env: DISCORD_WEBHOOK
+  channels:
+    worker_events: "#engineering-worker"
+    escalations: "#engineering-escalations"
+  notifications:
+    worker_started: true
+    issue_detected: true
+    issue_solved: true
+    pull_request_created: true
+    retry_started: true
+    retry_failed: true
+    escalation: true
+    worker_error: true
+    health_warning: true

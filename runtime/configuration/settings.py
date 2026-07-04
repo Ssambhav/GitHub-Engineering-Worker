@@ -30,6 +30,12 @@ class GitHubSettings:
     owner: str | None = None
     repository: str | None = None
     token_env: str = "GITHUB_TOKEN"
+    workspace_path: Path = Path(".workspaces")
+    branch_naming_template: str = "gew/issue-{issue_number}-{slug}"
+    commit_message_template: str = "Fix issue #{issue_number}: {title}"
+    pr_template: str = "{summary}\n\nCloses #{issue_number}"
+    cleanup_policy: str = "keep"
+    rate_limit_threshold: int = 25
     default_base_branch: str = "main"
     branch_prefix: str = "gew/"
 
@@ -59,4 +65,3 @@ class RuntimeConfiguration:
     execution: ExecutionSettings = field(default_factory=ExecutionSettings)
     observability: ObservabilitySettings = field(default_factory=ObservabilitySettings)
     policies: Mapping[str, str] = field(default_factory=immutable_mapping)
-

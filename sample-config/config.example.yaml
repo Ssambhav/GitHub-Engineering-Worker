@@ -1,0 +1,39 @@
+project:
+  name: GitHub Engineering Worker
+  mode: autonomous-engineering-worker
+  environment: production
+
+openclaw:
+  workspace: .
+  runtime_dir: runtime
+  state_dir: states
+  memory_dir: memory
+  audit_dir: audit
+
+github:
+  owner: your-org
+  repository: your-repo
+  token_env: GITHUB_TOKEN
+  workspace_path: .workspaces
+  default_base_branch: main
+  branch_prefix: gew/
+  branch_naming_template: gew/issue-{issue_number}-{slug}
+  commit_message_template: "Fix issue #{issue_number}: {title}"
+  pr_template: "{summary}\n\nCloses #{issue_number}"
+  cleanup_policy: keep
+  rate_limit_threshold: 25
+
+execution:
+  dry_run: false
+  max_parallel_issues: 1
+  max_retry_attempts: 3
+  require_human_approval_for:
+    - destructive_git_operations
+    - production_deployments
+    - dependency_major_upgrades
+    - security_sensitive_changes
+
+observability:
+  log_level: info
+  audit_decisions: true
+  retain_runtime_artifacts: true

@@ -99,7 +99,7 @@ class ExecutionRuntime:
             return
         register_core_agents(
             self.registry,
-            services=RuntimeServices(registry=self.registry, event_bus=self.event_bus),
+            services=RuntimeServices(registry=self.registry, event_bus=self.event_bus, configuration=self.configuration),
             agent_types=agent_types,
         )
 
@@ -113,6 +113,6 @@ class ExecutionRuntime:
 
         register_core_tools(self.registry)
         assert self.configuration is not None
-        services = RuntimeServices(registry=self.registry, event_bus=self.event_bus)
+        services = RuntimeServices(registry=self.registry, event_bus=self.event_bus, configuration=self.configuration)
         tool_configuration = ToolConfiguration.from_environment(self.configuration.openclaw.workspace)
         self.tool_executor = ToolExecutor(self.tool_registry, services, tool_configuration)

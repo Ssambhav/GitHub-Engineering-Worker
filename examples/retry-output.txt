@@ -1,0 +1,7 @@
+Retry Started
+Issue: your-org/your-repo#42
+Attempt: 2
+Reason: validation failed after patch application
+
+Recovery
+The worker re-ran repository context gathering with additional files and generated a narrower patch.

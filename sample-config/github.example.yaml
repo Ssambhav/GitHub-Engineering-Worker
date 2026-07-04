@@ -1,0 +1,19 @@
+github:
+  owner: your-org
+  repository: your-repo
+  token_env: GITHUB_TOKEN
+  workspace_path: .workspaces
+  default_base_branch: main
+  branch_naming_template: gew/issue-{issue_number}-{slug}
+  commit_message_template: "Fix issue #{issue_number}: {title}"
+  pr_template: "{summary}\n\nCloses #{issue_number}"
+  cleanup_policy: keep
+
+worker:
+  repositories:
+    - your-org/your-repo
+    - your-org/another-repo@main
+  auto_commit: true
+  auto_push: true
+  auto_create_pr: true
+  auto_cleanup: false

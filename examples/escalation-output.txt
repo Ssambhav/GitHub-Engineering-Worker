@@ -1,0 +1,13 @@
+Escalation Required
+Issue: your-org/your-repo#77
+Retries: 3
+Confidence: 31.8 critical
+Reasons:
+- maximum retries exceeded
+- repeated identical failures
+- confidence below escalation threshold
+
+Recommendation:
+Human review required. The issue likely needs product clarification or repository-specific setup unavailable to the worker.
+
+Report: reports/worker/worker_your-org_your-repo_77.json

@@ -11,5 +11,21 @@ readme = "README.md"
 license = { file = "LICENSE" }
 authors = [{ name = "GitHub Engineering Worker Contributors" }]
 
+[project.scripts]
+worker = "worker.cli:main"
+
 [tool.setuptools.packages.find]
-include = ["runtime*", "agents*", "tools*"]
+include = [
+    "runtime*",
+    "agents*",
+    "tools*",
+    "github*",
+    "engineering*",
+    "worker*",
+    "confidence*",
+    "audit*",
+    "escalation*",
+    "notifications*",
+    "discord*",
+    "reports*",
+]

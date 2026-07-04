@@ -1,0 +1,18 @@
+GitHub Issue
+  |
+  v
+Worker Watcher
+  |
+  v
+Persistent Queue
+  |
+  v
+Pipeline Controller
+  |
+  +--> Repository Workspace
+  +--> Engineering Pipeline
+  +--> Confidence Engine
+  +--> Retry / Escalation
+  +--> Git Workflow
+  +--> Pull Request
+  +--> Audit / Report / Discord

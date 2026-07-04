@@ -12,13 +12,27 @@ def discover_tool_types() -> tuple[Type[EngineeringTool], ...]:
     from tools.implementations import (
         DiffGenerationTool,
         DirectoryTraversalTool,
+        EngineeringPipelineTool,
         FileReaderTool,
         FileWriterTool,
+        GitHubBranchTool,
+        GitHubCommitTool,
+        GitHubIssueTool,
+        GitHubPullRequestTool,
+        GitHubRepositoryTool,
+        GitHubWorkspaceTool,
         RepositoryMetadataTool,
         RepositorySearchTool,
     )
 
     return (
+        GitHubRepositoryTool,
+        GitHubIssueTool,
+        GitHubWorkspaceTool,
+        GitHubBranchTool,
+        GitHubCommitTool,
+        GitHubPullRequestTool,
+        EngineeringPipelineTool,
         RepositoryMetadataTool,
         RepositorySearchTool,
         FileReaderTool,

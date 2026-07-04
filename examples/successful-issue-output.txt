@@ -1,0 +1,17 @@
+Issue Detected
+Issue: your-org/your-repo#42
+Title: Fix login error when session expires
+
+Pipeline Result
+Repository cloned: .workspaces/persistent/your-org/your-repo
+Branch: gew/issue-42-fix-login-error-when-session-expires
+Patch summary: Guard expired session lookup and add regression coverage.
+Tests: passed
+Confidence: 86.4 high
+Decision: proceed
+
+Pull Request Created
+Title: Fix issue #42: Fix login error when session expires
+Base: main
+Head: gew/issue-42-fix-login-error-when-session-expires
+Report: reports/worker/worker_your-org_your-repo_42.json

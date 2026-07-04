@@ -1,49 +1,317 @@
 # GitHub Engineering Worker
 
-GitHub Engineering Worker is an autonomous AI engineering platform built on OpenClaw. It receives a GitHub repository and a GitHub Issue, then coordinates specialized agents to understand the issue, gather repository context, identify root cause, plan a fix, apply approved changes, validate the result, recover from failures, escalate when necessary, and produce a professional engineering review.
+GitHub Engineering Worker is an autonomous OpenClaw-based engineering worker for GitHub Issues. It watches configured repositories, detects open issues, prepares a local workspace, analyzes the codebase, builds an AI prompt, generates and validates a patch, runs tests, decides whether to retry or proceed, creates a feature branch, commits, pushes, opens a pull request, records audit evidence, generates an engineering report, and notifies developers through Discord.
 
-This repository currently defines the platform foundation and architecture. It intentionally does not implement business logic, tools, workflows, retries, memory, or runtime state execution.
+The worker is designed as a small engineering organization: runtime orchestration coordinates bounded subsystems, and each subsystem owns one responsibility. Configuration decides how autonomous it should be.
 
 ## Architecture
 
-The system is designed as a multi-agent engineering organization rather than one giant prompt.
+```text
+GitHub Repository
+  |
+  v
+Worker Watcher -> Persistent Issue Queue -> Pipeline Controller
+                                      |
+                                      v
+Repository Workspace -> Engineering Pipeline -> Confidence Engine
+                                      |                |
+                                      v                v
+                              Patch / Tests       Decision Engine
+                                      |                |
+                                      v                v
+                              Git Workflow      Retry / Escalation
+                                      |                |
+                                      v                v
+                              Pull Request      Audit / Report / Discord
+```
 
-Core documents:
+Core subsystems:
 
-- [AGENTS.md](AGENTS.md): canonical agent architecture and contracts.
-- [WORKFLOW.md](WORKFLOW.md): canonical workflow engine and orchestration architecture.
-- [STATES.md](STATES.md): canonical execution state machine architecture.
-- [Architecture Overview](docs/architecture.md): system layers, lifecycle, autonomy boundaries, and extensibility model.
-- [Agent Reference](docs/agents.md): quick reference for required agents and responsibility boundaries.
-- [Agent Contract Specification](docs/specifications/agent-contract.md): reusable contract shape for production agents.
-- [Agent Communication Specification](docs/specifications/agent-communication.md): message, event, shared context, and synchronization model.
-- [Retry & Recovery System](retry/README.md): resilience layer, failure taxonomy, retry policies, recovery contracts, and escalation rules.
+- `worker/`: daemon, watcher, queue, scheduler, CLI, end-to-end controller, Git workflow.
+- `engineering/`: repository analysis, prompt building, provider calls, patch validation/application, tests.
+- `github/`: GitHub REST client, workspace management, branch, commit, and pull request services.
+- `confidence/`: weighted confidence estimation and decision recommendations.
+- `audit/`: structured JSONL audit trail.
+- `reports/`: typed engineering report generation.
+- `escalation/`: escalation rules for unsafe or low-confidence work.
+- `notifications/` and `discord/`: optional notification delivery.
+- `runtime/`, `agents/`, `tools/`, `retry/`, `memory/`, `workflows/`: OpenClaw runtime and engineering support systems.
 
-## Design Principles
+## Features
 
-- Separate lifecycle coordination from engineering execution.
-- Give each agent a clearly bounded responsibility.
-- Communicate through artifacts, structured messages, and events.
-- Centralize state ownership and audit logging.
-- Use evidence-backed confidence reporting.
-- Make workflow transitions deterministic, explainable, and auditable.
-- Escalate when autonomy would be unsafe.
-- Keep architecture declarative until implementation work is explicitly scoped.
+- Continuous repository watching.
+- Sequential issue processing with persistent queue state.
+- Duplicate issue prevention and processed issue history.
+- Public repository dry-run support without a GitHub token.
+- AI provider fallback to the deterministic mock provider when no AI key is configured.
+- Patch validation and optional patch application.
+- Test detection and execution.
+- Confidence-driven decisioning.
+- Retry and escalation paths.
+- Feature branch creation, commit, push, and pull request creation.
+- Dry-run pull request creation when GitHub credentials are unavailable.
+- Structured audit logging.
+- Engineering report persistence.
+- Optional Discord webhook notifications.
 
-## Repository Areas
+## Installation
 
-- `agents/`: agent domain folders and future implementation locations.
-- `docs/`: architecture, specifications, and operator documentation.
-- `configuration/`: declarative settings and future environment configuration.
-- `memory/`: memory documentation and future memory stores.
-- `states/`: execution state machine contracts, definitions, transition graph, events, validators, and future state stores.
-- `audit/`: audit documentation and future audit evidence.
-- `retry/`: retry and recovery policies, contracts, strategy templates, history records, reports, and future retry queues.
-- `review/`: review documentation and future review artifacts.
-- `tools/`: tool integration documentation and future tool adapters.
-- `workflows/`: workflow documentation and future workflow definitions.
-- `runtime/`: runtime artifact, cache, sandbox, and temporary areas.
+Requires Python 3.12 or newer.
 
-## Status
+```bash
+python -m pip install -e .
+```
 
-Foundation and architecture documentation are the current focus. Contributors should preserve the declarative boundary: do not add stub implementation code or hardcoded prompts when updating architecture documents.
+After installation, the `worker` CLI is available through the package script.
+
+```bash
+worker --help
+```
+
+## Configuration
+
+Start from the provided examples:
+
+- `.env.example`
+- `sample-config/config.example.yaml`
+- `sample-config/github.example.yaml`
+- `sample-config/provider.example.yaml`
+- `sample-config/discord.example.yaml`
+
+Minimum environment for a live repository:
+
+```bash
+GITHUB_OWNER=your-org
+GITHUB_REPOSITORY=your-repo
+GITHUB_TOKEN=ghp_...
+OPENAI_API_KEY=sk-...
+DISCORD_WEBHOOK=https://discord.com/api/webhooks/...
+```
+
+For multiple repositories:
+
+```bash
+WORKER_REPOSITORIES=owner/repo,owner/another-repo@main
+```
+
+## Quick Start
+
+Run one polling/execution cycle:
+
+```bash
+worker once
+```
+
+Watch continuously:
+
+```bash
+worker watch
+```
+
+Process one issue directly:
+
+```bash
+worker issue --repo owner/repo --issue 123
+```
+
+Run a replay without waiting for the watcher:
+
+```bash
+worker replay --repo owner/repo --issue 123
+```
+
+Inspect status, queue, reports, and logs:
+
+```bash
+worker status
+worker queue
+worker report
+worker logs
+```
+
+## CLI Commands
+
+- `worker run`: run using configured scheduling mode.
+- `worker watch`: continuously poll configured repositories.
+- `worker once`: poll and process at most one queued issue.
+- `worker issue --repo <owner/repo> --issue <number>`: enqueue and process an issue.
+- `worker retry --repo <owner/repo> --issue <number>`: enqueue a retry attempt.
+- `worker replay --repo <owner/repo> --issue <number>`: execute the pipeline controller for one issue.
+- `worker report [--execution-id <id>]`: list generated report files.
+- `worker queue`: print queued issue keys.
+- `worker logs`: print worker audit log content.
+- `worker status`: print persisted runtime status.
+- `worker health`: run configuration, workspace, GitHub, and provider health checks.
+- `worker config validate`: validate worker configuration.
+
+## Worker Lifecycle
+
+1. Load runtime and worker configuration.
+2. Start runtime services.
+3. Poll configured GitHub repositories.
+4. Enqueue new open issues.
+5. Skip closed, processed, duplicate, or in-progress issues.
+6. Clone or refresh the repository workspace.
+7. Create a feature branch.
+8. Run the engineering pipeline.
+9. Validate and apply patch.
+10. Run tests.
+11. Calculate confidence.
+12. Decide: retry, escalate, or create a PR.
+13. Commit, push, and create a pull request when thresholds pass.
+14. Persist audit logs and engineering reports.
+15. Send optional Discord notification.
+16. Sleep until the next schedule.
+
+## Supported AI Providers
+
+- OpenAI through `OPENAI_API_KEY`.
+- OpenRouter through `OPENROUTER_API_KEY`.
+- Mock provider for offline smoke tests and dry runs.
+
+Provider selection is controlled by `WORKER_PROVIDER`, `WORKER_MODEL`, and engineering configuration.
+
+## Supported Git Providers
+
+The current implementation targets GitHub through the existing GitHub integration. The repository and tool boundaries are intentionally provider-aware, but live support is GitHub-only in this milestone.
+
+## Repository Requirements
+
+Target repositories should:
+
+- Be cloneable by the configured GitHub token or publicly cloneable for dry runs.
+- Have a valid default branch.
+- Allow feature branch pushes for live PR creation.
+- Include tests or build metadata when test execution is expected.
+- Be safe for automated patch generation and review.
+
+The worker never commits directly to the default branch.
+
+## Discord Integration
+
+Discord notifications are optional. The worker continues operating if Discord is unavailable.
+
+Enable Discord:
+
+```bash
+DISCORD_ENABLED=true
+DISCORD_WEBHOOK=https://discord.com/api/webhooks/...
+```
+
+Notification types include worker started, issue detected, issue solved, pull request created, retry started, retry failed, escalation, worker error, and health warning.
+
+## Engineering Pipeline
+
+The engineering pipeline performs:
+
+- repository search
+- context building
+- prompt construction
+- provider call
+- patch generation
+- patch validation
+- patch application
+- repository validation
+- test detection
+- optional test execution
+
+When no AI provider key exists, the mock provider returns a deterministic patch for smoke testing.
+
+## Environment Variables
+
+Common variables:
+
+- `GITHUB_OWNER`
+- `GITHUB_REPOSITORY`
+- `WORKER_REPOSITORIES`
+- `GITHUB_TOKEN`
+- `OPENAI_API_KEY`
+- `OPENROUTER_API_KEY`
+- `WORKER_PROVIDER`
+- `WORKER_MODEL`
+- `DISCORD_ENABLED`
+- `DISCORD_WEBHOOK`
+- `WORKER_POLL_INTERVAL_MINUTES`
+- `WORKER_AUTO_CREATE_PR`
+- `WORKER_AUTO_PUSH`
+- `WORKER_AUTO_COMMIT`
+- `WORKER_AUTO_CLEANUP`
+- `WORKER_CONTINUE_ON_FAILURE`
+- `WORKER_CONFIDENCE_THRESHOLD`
+- `WORKER_RUN_TESTS`
+
+## Example Workflow
+
+```text
+Issue #42 opened
+Worker detects owner/repo#42
+Repository cloned to workspace
+Feature branch gew/issue-42-fix-login-error created
+Engineering pipeline generates patch
+Patch validates and tests pass
+Confidence: 86.4 high
+Worker commits and pushes branch
+Pull request opened
+Audit and report persisted
+Discord success notification sent
+```
+
+See `examples/` and `demo/` for sample output and runnable demonstration material.
+
+## Example Output
+
+```text
+Pull Request Created
+Issue: owner/repo#42
+Branch: gew/issue-42-fix-login-error
+Confidence: 86.4
+Decision: proceed
+Report: reports/worker/worker_owner_repo_42.json
+```
+
+## Failure Handling
+
+If a stage fails, the controller records audit evidence, generates a report, evaluates recoverability, and either retries or escalates. A single issue failure does not stop the worker from watching or processing later issues when `WORKER_CONTINUE_ON_FAILURE=true`.
+
+## Confidence
+
+The confidence engine scores issue understanding, repository understanding, repository search, context quality, prompt quality, AI response, patch quality, validation, tests, retry count, and failure history.
+
+Default decision bands:
+
+- `90-100`: very high, auto PR.
+- `75-89`: high, proceed.
+- `60-74`: medium, retry allowed.
+- `40-59`: low, gather more context.
+- `<40`: critical, escalate.
+
+## Retry
+
+Retries are bounded by configuration. The worker retries recoverable issue failures and marks issues escalated after the retry budget is exhausted.
+
+## Escalation
+
+Escalation occurs when confidence is too low, retry limits are exceeded, unsafe patch evidence appears, repeated failures occur, repository corruption is detected, provider availability blocks execution, or an unknown failure remains.
+
+## Audit
+
+Audit entries are JSONL records containing execution ID, issue, repository, stage, action, result, confidence, retry count, duration, and metadata. They are queryable through the audit logger and visible through `worker logs`.
+
+## Roadmap
+
+- Additional git providers.
+- Richer report rendering formats.
+- Hosted dashboard for worker status.
+- More granular confidence signals from each engineering artifact.
+- CI-native deployment templates.
+
+## Limitations
+
+- Live PR creation requires a GitHub token with clone, push, and pull request permissions.
+- Real patch quality depends on the configured AI provider and repository context quality.
+- Discord delivery requires a valid webhook.
+- The mock provider is intended for smoke tests, not production fixes.
+
+## Future Improvements
+
+Future improvements are separate from required functionality: Docker packaging, GitHub Actions workflows, hosted demo assets, video demos, dashboards, and additional provider integrations.

@@ -93,6 +93,12 @@ class RuntimeConfigurationProvider:
                 owner=_optional_str(github.get("owner")),
                 repository=_optional_str(github.get("repository")),
                 token_env=str(github.get("token_env", "GITHUB_TOKEN")),
+                workspace_path=Path(str(github.get("workspace_path", ".workspaces"))),
+                branch_naming_template=str(github.get("branch_naming_template", "gew/issue-{issue_number}-{slug}")),
+                commit_message_template=str(github.get("commit_message_template", "Fix issue #{issue_number}: {title}")),
+                pr_template=str(github.get("pr_template", "{summary}\n\nCloses #{issue_number}")),
+                cleanup_policy=str(github.get("cleanup_policy", "keep")),
+                rate_limit_threshold=int(github.get("rate_limit_threshold", 25)),
                 default_base_branch=str(github.get("default_base_branch", "main")),
                 branch_prefix=str(github.get("branch_prefix", "gew/")),
             ),
@@ -117,6 +123,8 @@ class RuntimeConfigurationProvider:
             raise ConfigurationException("max_retry_attempts cannot be negative")
         if not config.github.token_env:
             raise ConfigurationException("github.token_env must be configured")
+        if config.github.rate_limit_threshold < 0:
+            raise ConfigurationException("github.rate_limit_threshold cannot be negative")
 
 
 def _optional_str(value: Any) -> str | None:
@@ -195,4 +203,3 @@ def _parse_scalar(value: str) -> Any:
         return int(value)
     except ValueError:
         return value
-
