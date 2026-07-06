@@ -35,10 +35,8 @@ Schema:
   ],
   "final_response_intent": "what to tell the human after observations"
 }
-Use worker for GitHub issue work, issue creation, live issue listing, queue, status, retry, reports, health, pause, and resume.
-For requests like "fix issue 4", "work issue #4", "solve issue 4", or "commit issue 4", use worker operation work_issue with issue_number and repository when known.
-For natural bug reports in issue-forge, use worker operation create_issue with title, description, labels, and repository when known.
-For "what issues are there", "list repo issues", or "issues on my GitHub repo", use worker operation issues. Do not answer from queue/status alone.
+Use worker for GitHub engineering work. Worker operations must be selected from the runtime capability registry supplied by the application, not invented.
+For natural GitHub engineering requests, choose tool "worker" and put the user's intent in inputs if you are unsure which runtime capability applies.
 Use browser for websites, searches, page reading, screenshots, and interactions.
 For requests like "open/read", "search/read", "tell me what is on this page", or "top videos/titles", use browser operation open_and_read with url/query/browser_type inputs when available.
 Use memory for remember, forget, or show memory requests.
@@ -92,7 +90,7 @@ class DiscordAIWorker:
         return normalized in {"now do it", "do it", "try again", "run it", "again", "now"} or normalized.startswith("now do it ")
 
     def _plan(self, message: str) -> dict[str, Any]:
-        prompt = "\n".join((SYSTEM_PROMPT, "Discord message:", message))
+        prompt = "\n".join((SYSTEM_PROMPT, "Registered worker capabilities:", self._worker_capability_prompt(), "Discord message:", message))
         try:
             text = self.openclaw.infer_text(prompt)
             plan = _json_object(text)
@@ -102,6 +100,19 @@ class DiscordAIWorker:
             plan["actions"] = [{"tool": "general_ai", "operation": "answer", "inputs": {}}]
         return plan
 
+    def _worker_capability_prompt(self) -> str:
+        return json.dumps(
+            {
+                name: {
+                    "description": capability.description,
+                    "requires_issue_number": capability.requires_issue_number,
+                    "requires_description": capability.requires_description,
+                }
+                for name, capability in self.worker.capabilities().items()
+            },
+            sort_keys=True,
+        )
+
     def _execute_plan(self, plan: Mapping[str, Any], *, message: str, user_id: str | None, channel_id: str | None) -> list[dict[str, Any]]:
         observations: list[dict[str, Any]] = []
         for index, raw_action in enumerate(plan.get("actions", []), start=1):
@@ -109,6 +120,21 @@ class DiscordAIWorker:
             tool = str(action.get("tool") or "general_ai")
             operation = str(action.get("operation") or "answer")
             inputs = action.get("inputs") if isinstance(action.get("inputs"), Mapping) else {}
+            validation = self._validate_action(tool, operation, inputs, original_message=message)
+            if not validation["valid"]:
+                observation = {
+                    "step": index,
+                    "tool": tool,
+                    "operation": operation,
+                    "success": False,
+                    "output": validation,
+                }
+                observations.append(observation)
+                self._audit_decision(message, observation, user_id=user_id, channel_id=channel_id)
+                if self.memory is not None:
+                    self.memory.propose_update(f"discord:observation:{index}", observation)
+                continue
+            operation = str(validation.get("operation") or operation)
             try:
                 output = self._execute_action(tool, operation, inputs, original_message=message)
                 success = True
@@ -136,41 +162,36 @@ class DiscordAIWorker:
         raise ValueError(f"unsupported planned tool: {tool}")
 
     def _worker(self, operation: str, inputs: Mapping[str, Any], *, original_message: str) -> str:
-        if operation in {"check_now", "check-github", "run", "run_now"}:
-            return self.worker.check_now()
-        if operation in {"status", "queue", "show_queue"}:
-            return self.worker.status()
-        if operation in {"issues", "list_issues", "open_issues", "github_issues", "repo_issues"}:
-            return self.worker.issues()
-        if operation in {"report", "latest_report"}:
-            return self.worker.report()
-        if operation in {"retry", "retry_failed", "retry_latest_failed"}:
-            return self.worker.retry_latest_failed()
-        if operation == "health":
-            return self.worker.health()
-        if operation == "pause":
-            return self.worker.pause()
-        if operation == "resume":
-            return self.worker.resume()
-        if operation in {
-            "work_issue",
-            "fix_issue",
-            "solve_issue",
-            "issue",
-            "commit_issue",
-            "handle_issue",
-            "process_issue",
-            "run_issue",
-        }:
-            return self.worker.solve_issue(self._issue_number(inputs, original_message), repository=inputs.get("repository"))
-        if operation in {"create_issue", "forge_issue", "new_issue"}:
-            return self.worker.create_issue(
-                title=str(inputs.get("title") or ""),
-                description=str(inputs.get("description") or inputs.get("body") or original_message),
-                labels=tuple(str(label) for label in inputs.get("labels", ()) if str(label).strip()),
-                repository=inputs.get("repository"),
-            )
-        raise ValueError(f"unsupported worker operation: {operation}")
+        resolution = self.worker.resolve_capability(operation, message=original_message, inputs=inputs)
+        if not resolution.supported or resolution.capability is None:
+            return json.dumps(self._unsupported_capability(operation, resolution), indent=2, sort_keys=True)
+        return self.worker.execute_capability(resolution.capability, inputs=inputs, message=original_message)
+
+    def _validate_action(self, tool: str, operation: str, inputs: Mapping[str, Any], *, original_message: str) -> dict[str, Any]:
+        if tool != "worker":
+            return {"valid": True, "operation": operation}
+        resolution = self.worker.resolve_capability(operation, message=original_message, inputs=inputs)
+        if resolution.supported and resolution.capability is not None:
+            return {
+                "valid": True,
+                "operation": resolution.capability.name,
+                "requested_operation": operation,
+                "reason": resolution.reason,
+            }
+        return self._unsupported_capability(operation, resolution)
+
+    def _unsupported_capability(self, operation: str, resolution: Any) -> dict[str, Any]:
+        return {
+            "valid": False,
+            "status": "unsupported_capability",
+            "requested_operation": operation,
+            "closest_capability": resolution.capability.name if resolution.capability is not None else None,
+            "equivalent": False,
+            "confidence": resolution.confidence,
+            "reason": resolution.reason,
+            "available_capabilities": sorted(self.worker.capabilities().keys()),
+            "candidates": list(resolution.candidates),
+        }
 
     def _browser(self, operation: str, inputs: Mapping[str, Any], *, original_message: str) -> Mapping[str, Any]:
         request_inputs = dict(inputs)
