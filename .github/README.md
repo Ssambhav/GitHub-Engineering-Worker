@@ -272,18 +272,42 @@ The current worker can autonomously:
 
 # 🚀 Future Improvements
 
-Future versions will focus on:
+The current version requires a user to manually trigger the engineering workflow using a command like:
 
-- Multi-agent collaboration
-- Parallel issue solving
-- Automatic regression testing
-- CI/CD integration
-- Semantic repository memory
-- Long-term engineering learning
-- Repository-wide reasoning
-- Continuous engineering workflows
+```text
+Fix issue #12
+```
 
----
+Future versions aim to make the worker **fully autonomous**, allowing it to continuously monitor repositories and respond without manual intervention.
+
+Planned improvements include:
+
+- 🔄 **Automatic GitHub Issue Monitoring**  
+  Periodically check repositories (e.g., every 30 minutes using a scheduler or cron job). When a new issue is detected, automatically begin the engineering workflow.
+
+- 🤖 **Hands-Free Issue Resolution**  
+  Remove the need for manual Discord commands by allowing the worker to detect, prioritize, and work on new issues autonomously.
+
+- 👥 **Multi-Agent Collaboration**  
+  Introduce specialized AI agents (Issue Analyzer, Repository Investigator, Code Engineer, Reviewer) that collaborate to solve complex engineering tasks.
+
+- 🧪 **Automatic Validation Pipeline**  
+  Execute project-specific tests, linting, or build commands when available before creating a Pull Request.
+
+- 🧠 **Long-Term Engineering Memory**  
+  Learn from previous engineering attempts to avoid repeating failed solutions and improve future decisions.
+
+- 📊 **Smarter Issue Prioritization**  
+  Automatically prioritize issues based on severity, labels, or repository rules.
+
+- 🔔 **Proactive Notifications**  
+  Notify maintainers when engineering work starts, finishes, requires human review, or encounters blockers.
+
+- 🌐 **Multi-Repository Support**  
+  Allow a single worker to manage and engineer across multiple GitHub repositories simultaneously.
+
+- 🚀 **CI/CD Integration**  
+  Automatically trigger engineering workflows after CI failures or merge completed Pull Requests once all checks succeed.
 
 # 🏗 System Architecture
 ```
