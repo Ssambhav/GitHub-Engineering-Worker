@@ -310,6 +310,284 @@ Planned improvements include:
   Automatically trigger engineering workflows after CI failures or merge completed Pull Requests once all checks succeed.
 
 # 🏗 System Architecture
+
+The project is intentionally divided into independent layers so that engineering logic remains separate from communication and infrastructure.
+
+```text
+                    GitHub Repository
+                           │
+                           ▼
+                   GitHub Engineering Worker
+                           │
+        ┌──────────────────┼──────────────────┐
+        │                  │                  │
+        ▼                  ▼                  ▼
+  Discord Runtime      Worker Runtime      Memory
+        │                  │                  │
+        └──────────────────┼──────────────────┘
+                           │
+                           ▼
+                Engineering Controller
+                           │
+                           ▼
+                   OpenClaw Agent
+                           │
+                           ▼
+               Repository Investigation
+                           │
+                           ▼
+                  Source Code Changes
+                           │
+                           ▼
+                         Git
+                           │
+                           ▼
+                    Pull Request
+                           │
+                           ▼
+                    Engineering Report
 ```
-(continue with the architecture section here...)
+
+---
+
+# ⚙ Engineering Pipeline
+
+Every GitHub issue follows the same engineering pipeline.
+
+```text
+GitHub Issue
+      │
+      ▼
+Issue Understanding
+      │
+      ▼
+Repository Investigation
+      │
+      ▼
+Relevant File Discovery
+      │
+      ▼
+Root Cause Analysis
+      │
+      ▼
+Engineering Solution
+      │
+      ▼
+Source Code Changes
+      │
+      ▼
+Git Commit
+      │
+      ▼
+Push Branch
+      │
+      ▼
+Create Pull Request
+      │
+      ▼
+Engineering Report
 ```
+
+Every stage has a clearly defined responsibility, making the workflow explainable and easy to debug.
+
+---
+
+# 🧭 Engineering Decision Flow
+
+Unlike traditional AI coding assistants, the worker follows an engineering reasoning process before modifying code.
+
+```text
+Read Issue
+      │
+      ▼
+Understand Expected Behaviour
+      │
+      ▼
+Investigate Repository
+      │
+      ▼
+Locate Relevant Files
+      │
+      ▼
+Identify Root Cause
+      │
+      ▼
+Plan Engineering Changes
+      │
+      ▼
+Modify Source Code
+      │
+      ▼
+Generate Pull Request
+```
+
+The objective is to solve the engineering problem rather than simply generating code.
+
+---
+
+# 💬 Example Workflow
+
+User sends:
+
+```text
+Fix issue #12
+```
+
+Worker performs:
+
+```text
+✔ Reads Issue #12
+
+✔ Clones Repository
+
+✔ Creates Issue Branch
+
+✔ Investigates Repository
+
+✔ Finds Relevant Files
+
+✔ Engineers Solution
+
+✔ Commits Changes
+
+✔ Pushes Branch
+
+✔ Creates Pull Request
+
+✔ Reports Results in Discord
+```
+
+---
+
+# 📂 Project Structure
+
+```text
+discord/
+    Discord gateway and user interaction
+
+engineering/
+    Engineering pipeline and autonomous reasoning
+
+worker/
+    Runtime orchestration
+
+github/
+    GitHub integration
+
+git/
+    Git operations
+
+memory/
+    Engineering memory
+
+reports/
+    Engineering reports
+
+tools/
+    Runtime capabilities
+
+tests/
+    Automated tests
+
+states/
+    Queue, scheduler and worker state
+
+runtime/
+    Runtime resources
+```
+
+---
+
+# 🛡 Design Principles
+
+This project follows a few simple principles.
+
+### Autonomous Engineering
+
+The worker should solve engineering problems with minimal human intervention.
+
+---
+
+### Explainable Decisions
+
+Every engineering action should be traceable through reports and logs.
+
+---
+
+### Modular Components
+
+Communication, engineering, runtime and tools are separated into independent modules.
+
+---
+
+### Safe Automation
+
+The worker should avoid making unsupported assumptions and escalate only when autonomous engineering is no longer appropriate.
+
+---
+
+# 📊 Current Status
+
+Current project capabilities:
+
+- ✅ Discord-controlled engineering worker
+- ✅ GitHub Issue understanding
+- ✅ Repository investigation
+- ✅ Autonomous source-code modification
+- ✅ Git branch creation
+- ✅ Pull Request creation
+- ✅ Queue management
+- ✅ Retry and escalation workflow
+- ✅ Engineering memory
+- ✅ Engineering reports
+- ✅ Dynamic runtime capabilities
+- 🚧 Continuous autonomous monitoring (planned)
+
+---
+
+# 🎥 Demonstration
+
+The demo showcases the complete engineering workflow.
+
+```text
+Discord Command
+        │
+        ▼
+Fix issue #12
+        │
+        ▼
+Repository Investigation
+        │
+        ▼
+Engineering Solution
+        │
+        ▼
+GitHub Branch
+        │
+        ▼
+Pull Request
+        │
+        ▼
+Discord Summary
+```
+
+---
+
+# 🤝 Contributing
+
+Contributions are welcome.
+
+Areas of interest include:
+
+- Engineering reasoning
+- Agent orchestration
+- Tool integrations
+- GitHub automation
+- Memory systems
+- Testing
+- Runtime improvements
+- Documentation
+
+Please open an Issue before submitting large architectural changes.
+
+---
