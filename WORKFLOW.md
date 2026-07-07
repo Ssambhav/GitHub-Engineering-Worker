@@ -1,6 +1,6 @@
 # GitHub Engineering Worker Workflow Engine
 
-GitHub Engineering Worker uses a production-grade workflow engine to coordinate agents, tools, state, retries, validation, escalation, and review for the lifecycle of a GitHub Issue. The workflow engine is the central execution model of the platform.
+GitHub Engineering Worker uses a production-grade workflow engine to coordinate issue intake, repository preparation, OpenClaw Agent execution, Git branch/PR handoff, escalation, and review for the lifecycle of a GitHub Issue. The workflow engine is the central execution model of the platform.
 
 This document is declarative architecture only. It does not implement runtime code, agents, tools, memory, retry logic, state machines, or business logic.
 
@@ -50,7 +50,7 @@ Receive Issue
       -> Review -> Completed
 ```
 
-The workflow is not a fixed prompt sequence. Each transition is gated by objective criteria, confidence thresholds, artifacts, state, and policy.
+The workflow is not a fixed prompt sequence. Each transition is gated by repository state, Git artifacts, execution outcomes, and policy.
 
 ## Execution Context
 
@@ -792,8 +792,8 @@ Rollback is a policy-governed recovery action. The workflow architecture records
 
 - Never modify code before issue understanding, context collection, file evidence, root cause analysis, and plan approval.
 - Never apply changes without an approved patch proposal and repository write lock.
-- Never execute validation commands before patch generation and validation strategy selection.
-- Never commit code before successful validation and explicit commit authorization.
+- Never require browser verification, localhost access, application URLs, build commands, test commands, automatic UI testing, or confidence thresholds before pull request creation.
+- Never commit code directly to the default branch.
 - Never retry a failed path without changed evidence, input, scope, hypothesis, or strategy.
 - Never escalate before bounded retry when failure is safely recoverable.
 - Escalate immediately when repository safety, permission integrity, auditability, or product intent is compromised.

@@ -21,7 +21,7 @@ github:
   branch_prefix: gew/
 
 execution:
-  dry_run: true
+  dry_run: false
   require_human_approval_for:
     - destructive_git_operations
     - production_deployments
@@ -34,6 +34,22 @@ observability:
   log_level: info
   audit_decisions: true
   retain_runtime_artifacts: false
+
+discord:
+  enabled: ${DISCORD_ENABLED:-true}
+  guild_id: ${DISCORD_GUILD_ID:-1523066948483682465}
+  token_env: DISCORD_BOT_TOKEN
+  auto_reconnect: true
+  slash_commands_enabled: true
+  channels:
+    worker_status: ${DISCORD_CHANNEL_WORKER_STATUS}
+    worker_activity: ${DISCORD_CHANNEL_WORKER_ACTIVITY}
+    worker_success: ${DISCORD_CHANNEL_WORKER_SUCCESS}
+    developer_escalations: ${DISCORD_CHANNEL_DEVELOPER_ESCALATIONS}
+    engineering_reports: ${DISCORD_CHANNEL_ENGINEERING_REPORTS}
+    worker_logs: ${DISCORD_CHANNEL_WORKER_LOGS}
+    metrics: ${DISCORD_CHANNEL_METRICS}
+    commands: ${DISCORD_CHANNEL_COMMANDS}
 
 policies:
   security: policies/security/README.md

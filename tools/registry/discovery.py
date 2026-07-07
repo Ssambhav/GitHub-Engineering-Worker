@@ -10,6 +10,7 @@ from tools.base import EngineeringTool
 
 def discover_tool_types() -> tuple[Type[EngineeringTool], ...]:
     from tools.implementations import (
+        BrowserAutomationTool,
         DiffGenerationTool,
         DirectoryTraversalTool,
         EngineeringPipelineTool,
@@ -26,6 +27,7 @@ def discover_tool_types() -> tuple[Type[EngineeringTool], ...]:
     )
 
     return (
+        BrowserAutomationTool,
         GitHubRepositoryTool,
         GitHubIssueTool,
         GitHubWorkspaceTool,

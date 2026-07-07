@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field, replace
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from audit import AuditEntry, AuditLogger
 from confidence import ConfidenceAssessment, ConfidenceEngine
-from discord import DiscordWebhookProvider
+from discord import DiscordBotProvider, DiscordWebhookProvider
 from escalation import EscalationEngine, EscalationReport
 from github.client import GitHubClient
 from github.configuration import GitHubIntegrationConfig
@@ -18,6 +19,7 @@ from github.issues import IssueService
 from notifications import Notification, NotificationService, NotificationType
 from reports import EngineeringReport, EngineeringReportGenerator
 from runtime.execution import ExecutionRuntime
+from runtime.configuration.environment import load_environment
 from runtime.models.common import CancellationToken, IssueRef, RepositoryRef, utc_now
 from worker.configuration import ScheduleMode, WorkerConfiguration, WorkerConfigurationLoader
 from worker.controller import PipelineController
@@ -66,6 +68,7 @@ class WorkerDaemon:
         self.status = WorkerStatus()
 
     def initialize(self) -> None:
+        load_environment()
         self.runtime_config, self.config = self.loader.load()
         self.runtime.configuration = self.runtime_config
         self.runtime.start()
@@ -94,7 +97,13 @@ class WorkerDaemon:
         self.report_generator = EngineeringReportGenerator()
         self.escalation_engine = EscalationEngine(self.config.decisions.escalation_rules)
         self.notifications = NotificationService(
-            providers=(DiscordWebhookProvider(self.config.decisions.discord_webhook),),
+            providers=(
+                DiscordBotProvider(
+                    os.environ.get(self.config.decisions.discord_bot.token_env),
+                    self.config.decisions.discord_bot,
+                ),
+                DiscordWebhookProvider(self.config.decisions.discord_webhook),
+            ),
             enabled=self.config.decisions.discord_enabled,
             enabled_types=set(self.config.decisions.notification_types),
         )
@@ -107,6 +116,7 @@ class WorkerDaemon:
             report_generator=self.report_generator,
             escalation_engine=self.escalation_engine,
             notifications=self.notifications,
+            runtime=self.runtime,
         )
         self._notify(
             Notification(
@@ -138,6 +148,11 @@ class WorkerDaemon:
     def tick(self) -> None:
         assert self.queue is not None
         assert self.watcher is not None
+        self._apply_scheduler_request()
+        if self._scheduler_paused():
+            self.status.queued_count = len(self.queue)
+            self._write_status()
+            return
         self.status.last_poll_at = utc_now()
         try:
             detected = self.watcher.poll()
@@ -185,14 +200,27 @@ class WorkerDaemon:
         self.status.running = False
         self._write_status()
 
+    def dispatch_issue_now(self, issue_key: str) -> Any:
+        if self.queue is None:
+            self.initialize()
+        assert self.queue is not None
+        issue = self.queue.dequeue_issue(issue_key)
+        if issue is None:
+            raise ValueError(f"issue is not queued: {issue_key}")
+        return self._execute_queued_issue(issue)
+
     def _drain_one(self) -> None:
+        assert self.queue is not None
+        issue = self.queue.dequeue()
+        if issue is None:
+            return
+        self._execute_queued_issue(issue)
+
+    def _execute_queued_issue(self, issue: WorkerIssue) -> Any:
         assert self.queue is not None
         assert self.processed_store is not None
         assert self.watcher is not None
         assert self.config is not None
-        issue = self.queue.dequeue()
-        if issue is None:
-            return
         self.status.current_issue = issue.key
         self.watcher.mark_in_progress(issue.key)
         self._write_status()
@@ -201,7 +229,7 @@ class WorkerDaemon:
             if result.succeeded:
                 self.processed_store.mark_processed(issue.key, status=result.status)
                 self.status.processed_count += 1
-            elif issue.attempts < self.config.max_retries:
+            elif self._should_retry_issue(result.status, attempts=issue.attempts):
                 self.queue.retry_enqueue(issue)
                 self._notify(
                     Notification(
@@ -215,7 +243,8 @@ class WorkerDaemon:
                     )
                 )
             else:
-                self.processed_store.mark_processed(issue.key, status="escalated")
+                self.processed_store.mark_processed(issue.key, status=result.status)
+            return result
         except Exception as exc:
             self._audit(
                 issue,
@@ -251,9 +280,15 @@ class WorkerDaemon:
                 )
             if not self.config.decisions.continue_on_failure:
                 raise
+            raise
         finally:
             self.watcher.clear_in_progress(issue.key)
             self.status.current_issue = None
+
+    def _should_retry_issue(self, status: str, *, attempts: int) -> bool:
+        if attempts >= self.config.max_retries:
+            return False
+        return status not in {"retry_or_escalate", "escalated"}
 
     def _execute_issue(self, issue: WorkerIssue) -> Any:
         assert self.config is not None
@@ -444,6 +479,36 @@ class WorkerDaemon:
             "started_at": self.status.started_at.isoformat(),
         }
         self.config.status_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+    def _scheduler_paused(self) -> bool:
+        if self.config is None:
+            return False
+        path = self.config.status_path.parent / "scheduler-control.json"
+        if not path.exists():
+            return False
+        try:
+            return bool(json.loads(path.read_text(encoding="utf-8")).get("paused"))
+        except json.JSONDecodeError:
+            return False
+
+    def _apply_scheduler_request(self) -> None:
+        if self.config is None:
+            return
+        path = self.config.status_path.parent / "scheduler-request.json"
+        if not path.exists():
+            return
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return
+        mode = str(data.get("mode") or self.config.mode)
+        interval_seconds = data.get("poll_interval_seconds")
+        poll_interval = self.config.poll_interval
+        if interval_seconds is not None:
+            poll_interval = timedelta(seconds=max(1, int(interval_seconds)))
+        cron = data.get("cron")
+        self.config = replace(self.config, mode=mode, poll_interval=poll_interval, cron=cron)
+        self.scheduler = WorkerScheduler(self.config, self.cancellation_token)
 
 
 def read_status(path: Path) -> dict[str, Any]:

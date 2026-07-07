@@ -77,11 +77,12 @@ class RepositoryWorkspaceManager:
         _run_git(path, ["fetch", "--prune"], RepositoryCloneException)
 
     def refresh(self, path: Path, branch: str) -> None:
-        """Fetch and pull the selected branch."""
+        """Fetch and reset the worker-owned checkout to the selected branch."""
 
         self.fetch(path)
         _run_git(path, ["checkout", branch], RepositoryCloneException)
-        _run_git(path, ["pull", "--ff-only"], RepositoryCloneException)
+        _run_git(path, ["reset", "--hard", f"origin/{branch}"], RepositoryCloneException)
+        _run_git(path, ["clean", "-fd"], RepositoryCloneException)
 
     def status(self, path: Path, repository: str) -> WorkspaceState:
         """Return current branch, changed files, cleanliness, and remote."""

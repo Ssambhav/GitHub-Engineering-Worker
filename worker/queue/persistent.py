@@ -48,6 +48,38 @@ class PersistentIssueQueue:
             self._save()
             return issue
 
+    def dequeue_issue(self, issue_key: str) -> WorkerIssue | None:
+        with self._lock:
+            for index, issue in enumerate(self._items):
+                if issue.key != issue_key:
+                    continue
+                matched = self._items.pop(index)
+                self._save()
+                return matched
+            return None
+
+    def clear(self) -> tuple[WorkerIssue, ...]:
+        with self._lock:
+            cleared = tuple(self._items)
+            self._items = []
+            self._save()
+            return cleared
+
+    def move_to_front(self, issue_key: str) -> WorkerIssue | None:
+        with self._lock:
+            for index, issue in enumerate(self._items):
+                if issue.key != issue_key:
+                    continue
+                matched = self._items.pop(index)
+                self._items.insert(0, matched)
+                self._save()
+                return matched
+            return None
+
+    def items(self) -> tuple[WorkerIssue, ...]:
+        with self._lock:
+            return tuple(self._items)
+
     def peek(self) -> WorkerIssue | None:
         with self._lock:
             return self._items[0] if self._items else None

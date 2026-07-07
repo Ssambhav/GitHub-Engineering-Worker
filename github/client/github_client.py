@@ -76,6 +76,38 @@ class GitHubClient:
         data = self._request("GET", f"/repos/{owner}/{repo}/labels?per_page=100")
         return tuple(str(item["name"]) for item in data)
 
+    def create_issue(
+        self,
+        owner: str,
+        repo: str,
+        *,
+        title: str,
+        body: str,
+        labels: tuple[str, ...] = (),
+        dry_run: bool = False,
+    ) -> GitHubIssue:
+        """Create or prepare a GitHub issue."""
+
+        payload: dict[str, Any] = {"title": title, "body": body}
+        if labels:
+            payload["labels"] = list(labels)
+        if dry_run:
+            return GitHubIssue(
+                number=0,
+                title=title,
+                state="open",
+                body=body,
+                html_url=f"{self.config.api_base_url.rstrip('/')}/repos/{owner}/{repo}/issues/dry-run",
+                labels=labels,
+                comments=0,
+                user_login=None,
+                created_at=None,
+                updated_at=None,
+                metadata={"dry_run": True, "payload": payload},
+            )
+        data = self._request("POST", f"/repos/{owner}/{repo}/issues", payload=payload, require_auth=True)
+        return self._issue_from_payload(data)
+
     def get_branch(self, owner: str, repo: str, branch: str) -> Mapping[str, Any]:
         """Read branch metadata."""
 

@@ -3,26 +3,15 @@
 from __future__ import annotations
 
 import json
-import os
 import re
-import subprocess
-import time
 from dataclasses import dataclass, field, replace
-from pathlib import Path
 from typing import Any, Mapping
-from urllib.error import URLError
-from urllib.request import urlopen
 
 from audit import AuditEntry, AuditLogger
 from decision.engine import JsonlDecisionMemory
 from engineering.providers.openclaw import OpenClawProvider, OpenClawProviderError
-from runtime.execution import ExecutionRuntime
-from runtime.models.common import IssueRef, RepositoryRef
-from tools.context import ToolRequest
 from worker.configuration import WorkerConfigurationLoader
-from worker.models import WorkerIssue
 from worker.runtime_interface import WorkerRuntimeInterface
-from playwright.sync_api import sync_playwright
 
 
 SYSTEM_PROMPT = """You are the brain of the GitHub Engineering Worker, an autonomous AI software engineer.
@@ -31,16 +20,13 @@ Schema:
 {
   "reasoning": "brief reason for the plan",
   "actions": [
-    {"tool": "general_ai|worker|browser|memory|scheduler", "operation": "name", "inputs": {}}
+    {"tool": "general_ai|runtime", "operation": "registered capability name", "inputs": {}}
   ],
   "final_response_intent": "what to tell the human after observations"
 }
-Use worker for GitHub engineering work. Worker operations must be selected from the runtime capability registry supplied by the application, not invented.
-For natural GitHub engineering requests, choose tool "worker" and put the user's intent in inputs if you are unsure which runtime capability applies.
-Use browser for websites, searches, page reading, screenshots, and interactions.
-For requests like "open/read", "search/read", "tell me what is on this page", or "top videos/titles", use browser operation open_and_read with url/query/browser_type inputs when available.
-Use memory for remember, forget, or show memory requests.
-Use scheduler for natural-language recurring worker schedules.
+All non-chat actions must go through the runtime capability registry supplied by the application.
+Never invent unsupported operations.
+If the exact capability is unclear, still choose tool "runtime" and use the closest registered capability or leave operation empty.
 Use general_ai when no tool is needed.
 Prefer combining actions when the user asks for a workflow.
 """
@@ -51,7 +37,6 @@ class DiscordAIWorker:
     """Turns Discord messages into OpenClaw plans executed by existing systems."""
 
     openclaw: OpenClawProvider = field(default_factory=OpenClawProvider)
-    runtime: ExecutionRuntime = field(default_factory=ExecutionRuntime)
     worker: WorkerRuntimeInterface = field(default_factory=WorkerRuntimeInterface)
     loader: WorkerConfigurationLoader = field(default_factory=WorkerConfigurationLoader)
     audit_logger: AuditLogger | None = None
@@ -59,19 +44,18 @@ class DiscordAIWorker:
     last_requests: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        if self.openclaw.model is None and os.environ.get("DISCORD_AI_MODEL"):
-            self.openclaw = replace(self.openclaw, model=os.environ["DISCORD_AI_MODEL"])
         _, config = self.loader.load()
+        if config.model and self.openclaw.model != config.model:
+            self.openclaw = replace(self.openclaw, model=config.model)
         self.audit_logger = self.audit_logger or AuditLogger(config.decisions.audit_directory)
         self.memory = self.memory or JsonlDecisionMemory(config.decisions.audit_directory / "discord-ai-memory.jsonl")
-        self.runtime.start()
 
     def respond(self, message: str, *, user_id: str | None = None, channel_id: str | None = None) -> str:
         message = self._resolve_followup_message(message, channel_id=channel_id)
         try:
             plan = self._plan(message)
         except RuntimeError as exc:
-            return f"OpenClaw is currently unavailable, so I cannot execute that Discord request yet. {exc}"
+            return self._planning_error_response(exc)
         observations = self._execute_plan(plan, message=message, user_id=user_id, channel_id=channel_id)
         if not self._is_followup_command(message) and channel_id:
             self.last_requests[channel_id] = message
@@ -90,6 +74,9 @@ class DiscordAIWorker:
         return normalized in {"now do it", "do it", "try again", "run it", "again", "now"} or normalized.startswith("now do it ")
 
     def _plan(self, message: str) -> dict[str, Any]:
+        direct = self._direct_runtime_plan(message)
+        if direct is not None:
+            return direct
         prompt = "\n".join((SYSTEM_PROMPT, "Registered worker capabilities:", self._worker_capability_prompt(), "Discord message:", message))
         try:
             text = self.openclaw.infer_text(prompt)
@@ -99,6 +86,16 @@ class DiscordAIWorker:
         if not isinstance(plan.get("actions"), list):
             plan["actions"] = [{"tool": "general_ai", "operation": "answer", "inputs": {}}]
         return plan
+
+    def _direct_runtime_plan(self, message: str) -> dict[str, Any] | None:
+        resolution = self.worker.resolve_capability("", message=message, inputs={})
+        if not resolution.supported or resolution.capability is None:
+            return None
+        return {
+            "reasoning": "Direct runtime command resolved from Discord message.",
+            "actions": [{"tool": "runtime", "operation": resolution.capability.name, "inputs": {}}],
+            "final_response_intent": "Report the runtime action result directly.",
+        }
 
     def _worker_capability_prompt(self) -> str:
         return json.dumps(
@@ -117,7 +114,8 @@ class DiscordAIWorker:
         observations: list[dict[str, Any]] = []
         for index, raw_action in enumerate(plan.get("actions", []), start=1):
             action = raw_action if isinstance(raw_action, Mapping) else {}
-            tool = str(action.get("tool") or "general_ai")
+            requested_tool = str(action.get("tool") or "general_ai")
+            tool = self._normalize_planned_tool(requested_tool)
             operation = str(action.get("operation") or "answer")
             inputs = action.get("inputs") if isinstance(action.get("inputs"), Mapping) else {}
             validation = self._validate_action(tool, operation, inputs, original_message=message)
@@ -127,7 +125,7 @@ class DiscordAIWorker:
                     "tool": tool,
                     "operation": operation,
                     "success": False,
-                    "output": validation,
+                    "output": {**validation, "requested_tool": requested_tool},
                 }
                 observations.append(observation)
                 self._audit_decision(message, observation, user_id=user_id, channel_id=channel_id)
@@ -141,7 +139,13 @@ class DiscordAIWorker:
             except Exception as exc:
                 output = {"error": str(exc)}
                 success = False
-            observation = {"step": index, "tool": tool, "operation": operation, "success": success, "output": output}
+            observation = {
+                "step": index,
+                "tool": tool,
+                "operation": operation,
+                "success": success,
+                "output": output,
+            }
             observations.append(observation)
             self._audit_decision(message, observation, user_id=user_id, channel_id=channel_id)
             if self.memory is not None:
@@ -151,24 +155,19 @@ class DiscordAIWorker:
     def _execute_action(self, tool: str, operation: str, inputs: Mapping[str, Any], *, original_message: str) -> Any:
         if tool == "general_ai":
             return {"answer_required": True}
-        if tool == "worker":
-            return self._worker(operation, inputs, original_message=original_message)
-        if tool == "browser":
-            return self._browser(operation, inputs, original_message=original_message)
-        if tool == "memory":
-            return self._memory(operation, inputs, original_message=original_message)
-        if tool == "scheduler":
-            return self._scheduler(operation, inputs)
+        if tool == "runtime":
+            return self._runtime(operation, inputs, original_message=original_message)
         raise ValueError(f"unsupported planned tool: {tool}")
 
-    def _worker(self, operation: str, inputs: Mapping[str, Any], *, original_message: str) -> str:
+    def _runtime(self, operation: str, inputs: Mapping[str, Any], *, original_message: str) -> str:
         resolution = self.worker.resolve_capability(operation, message=original_message, inputs=inputs)
         if not resolution.supported or resolution.capability is None:
             return json.dumps(self._unsupported_capability(operation, resolution), indent=2, sort_keys=True)
         return self.worker.execute_capability(resolution.capability, inputs=inputs, message=original_message)
 
     def _validate_action(self, tool: str, operation: str, inputs: Mapping[str, Any], *, original_message: str) -> dict[str, Any]:
-        if tool != "worker":
+        tool = self._normalize_planned_tool(tool)
+        if tool != "runtime":
             return {"valid": True, "operation": operation}
         resolution = self.worker.resolve_capability(operation, message=original_message, inputs=inputs)
         if resolution.supported and resolution.capability is not None:
@@ -183,218 +182,31 @@ class DiscordAIWorker:
     def _unsupported_capability(self, operation: str, resolution: Any) -> dict[str, Any]:
         return {
             "valid": False,
-            "status": "unsupported_capability",
+            "status": "unresolved_runtime_request",
             "requested_operation": operation,
             "closest_capability": resolution.capability.name if resolution.capability is not None else None,
             "equivalent": False,
             "confidence": resolution.confidence,
-            "reason": resolution.reason,
+            "reason": f"Stage: command routing\nReason: {resolution.reason}\nSuggested action: rephrase the request with an issue number or queue action.",
             "available_capabilities": sorted(self.worker.capabilities().keys()),
             "candidates": list(resolution.candidates),
         }
 
-    def _browser(self, operation: str, inputs: Mapping[str, Any], *, original_message: str) -> Mapping[str, Any]:
-        request_inputs = dict(inputs)
-        message_lower = original_message.lower()
-        if "opera" in message_lower and "browser_type" not in request_inputs:
-            request_inputs["browser_type"] = "opera"
-        if "browser" in request_inputs and "browser_type" not in request_inputs:
-            request_inputs["browser_type"] = request_inputs.pop("browser")
-        if self._should_show_browser_window(original_message):
-            request_inputs.setdefault("headless", False)
-        if str(request_inputs.get("browser_type", "")).lower() == "opera":
-            request_inputs.setdefault("headless", False)
-        action = request_inputs.pop("action", None) or self._browser_action(operation, request_inputs)
-        request_inputs["action"] = action
-        self._complete_browser_url(request_inputs, operation=operation, original_message=original_message)
-        if self._is_combined_browser_operation(operation, request_inputs, original_message):
-            return self._browser_open_and_read(request_inputs, original_message=original_message)
-        if self._should_use_main_opera_profile(request_inputs):
-            return self._open_main_opera(str(request_inputs["url"]))
-        return self._run_browser_tool(request_inputs)
-
-    def _is_combined_browser_operation(self, operation: str, inputs: Mapping[str, Any], original_message: str) -> bool:
-        operation_name = operation.lower().replace("-", "_")
-        if operation_name in {"open_and_read", "open_read", "read_homepage", "browse_and_read", "search_and_read"}:
-            return True
-        message = original_message.lower()
-        return bool(inputs.get("url")) and any(term in message for term in ("read", "tell me", "top 3", "top three", "what's on", "whats on"))
-
-    def _browser_open_and_read(self, inputs: Mapping[str, Any], *, original_message: str) -> Mapping[str, Any]:
-        if self._should_use_main_opera_profile(inputs):
-            return self._main_opera_open_and_read(inputs, original_message=original_message)
-        open_inputs = dict(inputs)
-        open_inputs["action"] = "open_url"
-        open_inputs.setdefault("wait_until", "domcontentloaded")
-        open_result = self._run_browser_tool(open_inputs)
-        if not open_result["success"]:
-            return {"success": False, "status": "failed", "steps": [open_result], "errors": open_result.get("errors", ())}
-
-        wait_result = self._run_browser_tool({"action": "wait_for_network_idle"})
-        links_result = self._run_browser_tool({"action": "read_links"})
-        text_result = self._run_browser_tool({"action": "read_visible_text"})
-        steps = [open_result, wait_result, links_result, text_result]
-        output: dict[str, Any] = {
-            "url": (open_result.get("output") or {}).get("url"),
-            "page_title": (open_result.get("output") or {}).get("page_title"),
-        }
-        if "youtube" in original_message.lower() or "youtube.com" in str(output.get("url", "")):
-            titles = self._youtube_video_titles(links_result, text_result)
-            output["top_video_titles"] = titles[: self._requested_count(original_message, default=3)]
-            if not output["top_video_titles"]:
-                output["note"] = "No visible YouTube video titles were found on the loaded homepage. YouTube may be showing a signed-out or empty personalized feed in the worker browser profile."
-        output["visible_text_excerpt"] = self._visible_text_excerpt(text_result)
-        return {"success": True, "status": "success", "operation": "open_and_read", "steps": steps, "output": output, "errors": ()}
-
-    def _run_browser_tool(self, inputs: Mapping[str, Any]) -> Mapping[str, Any]:
-        context = self._tool_context()
-        request = ToolRequest(tool_id="browser.automation", capability="browser.navigate", inputs=inputs)
-        assert self.runtime.tool_executor is not None
-        result = self.runtime.tool_executor.execute(request, self.runtime.tool_executor.create_context(context, request))
-        return {"success": result.success, "status": result.status.value, "output": dict(result.structured_output), "errors": result.errors}
-
-    def _should_use_main_opera_profile(self, inputs: Mapping[str, Any]) -> bool:
-        return (
-            str(inputs.get("browser_type", "")).lower() == "opera"
-            and str(inputs.get("action", "")).lower() == "open_url"
-            and bool(inputs.get("url"))
-            and _env_bool("GEW_USE_MAIN_BROWSER_PROFILE")
-        )
-
-    def _should_show_browser_window(self, message: str) -> bool:
-        return _env_bool("GEW_BROWSER_VISIBLE") or any(term in message.lower() for term in ("open", "show", "watch", "youtube", "github"))
-
-    def _open_main_opera(self, url: str) -> Mapping[str, Any]:
-        executable = os.environ.get("OPERA_EXECUTABLE") or r"C:\Users\HP\AppData\Local\Programs\Opera\opera.exe"
-        if not Path(executable).exists():
-            raise RuntimeError(f"Opera executable not found: {executable}")
-        subprocess.Popen([executable, url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        return {"success": True, "status": "success", "output": {"url": url, "browser_type": "opera", "profile": "main"}}
-
-    def _main_opera_open_and_read(self, inputs: Mapping[str, Any], *, original_message: str) -> Mapping[str, Any]:
-        url = str(inputs.get("url") or "about:blank")
-        port = int(os.environ.get("OPERA_REMOTE_DEBUGGING_PORT", "9223"))
-        self._ensure_main_opera_debuggable(url, port)
-        with sync_playwright() as playwright:
-            browser = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
-            context = browser.contexts[0] if browser.contexts else browser.new_context()
-            page = context.pages[-1] if context.pages else context.new_page()
-            page.goto(url, wait_until="domcontentloaded", timeout=45_000)
-            try:
-                page.wait_for_load_state("networkidle", timeout=15_000)
-            except Exception:
-                pass
-            page.bring_to_front()
-            links = page.eval_on_selector_all(
-                "a",
-                "(els) => els.map((a) => ({text: a.innerText, href: a.href, title: a.title}))",
-            )
-            visible_text = page.locator("body").inner_text(timeout=15_000)
-            output: dict[str, Any] = {"url": page.url, "page_title": page.title(), "profile": "main-opera-cdp"}
-            text_result = {"output": {"data": {"value": visible_text}}}
-            links_result = {"output": {"data": {"links": links}}}
-            if "youtube" in original_message.lower() or "youtube.com" in page.url:
-                titles = self._youtube_dom_video_titles(page) or self._youtube_video_titles(links_result, text_result)
-                output["top_video_titles"] = titles[: self._requested_count(original_message, default=3)]
-                if not output["top_video_titles"]:
-                    output["note"] = "No visible YouTube video titles were found in the main Opera page."
-            output["visible_text_excerpt"] = visible_text.strip()[:1800]
-            return {"success": True, "status": "success", "operation": "main_opera_open_and_read", "output": output, "errors": ()}
-
-    def _ensure_main_opera_debuggable(self, url: str, port: int) -> None:
-        if self._cdp_available(port):
-            return
-        executable = Path(os.environ.get("OPERA_EXECUTABLE") or r"C:\Users\HP\AppData\Local\Programs\Opera\opera.exe")
-        if not executable.exists():
-            raise RuntimeError(f"Opera executable not found: {executable}")
-        profile_path = Path(os.environ.get("OPERA_USER_DATA_DIR") or (Path(os.environ["APPDATA"]) / "Opera Software" / "Opera Stable"))
-        args = [
-            str(executable),
-            f"--remote-debugging-port={port}",
-            f"--user-data-dir={profile_path}",
-            "--no-first-run",
-            url,
-        ]
-        subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        for _ in range(20):
-            if self._cdp_available(port):
-                return
-            time.sleep(0.5)
-        if _env_bool("GEW_RESTART_OPERA_FOR_CONTROL"):
-            subprocess.run(["taskkill", "/IM", "opera.exe", "/F"], capture_output=True, text=True)
-            time.sleep(2)
-            subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            for _ in range(20):
-                if self._cdp_available(port):
-                    return
-                time.sleep(0.5)
-        raise RuntimeError(
-            "Main Opera is not controllable yet. Close all Opera windows once, then ask again, or keep GEW_RESTART_OPERA_FOR_CONTROL=true so the worker can restart Opera with remote debugging."
-        )
-
-    def _cdp_available(self, port: int) -> bool:
-        try:
-            with urlopen(f"http://127.0.0.1:{port}/json/version", timeout=1) as response:
-                if response.status != 200:
-                    return False
-                body = response.read().decode("utf-8", errors="replace").lower()
-                return "opera" in body or "opr" in body
-        except (OSError, URLError):
-            return False
-
-    def _complete_browser_url(self, inputs: dict[str, Any], *, operation: str, original_message: str) -> None:
-        if str(inputs.get("action")) != "open_url":
-            return
-        query = str(inputs.get("query") or "").strip()
-        message_lower = original_message.lower()
-        if "youtube" in message_lower:
-            if any(term in message_lower for term in ("homepage", "home page", "front page")) and not query:
-                inputs["url"] = "https://www.youtube.com/"
-                return
-            if not query:
-                query = self._extract_search_query(original_message)
-            if not query:
-                inputs["url"] = "https://www.youtube.com/"
-                return
-            inputs["url"] = f"https://www.youtube.com/results?search_query={query.replace(' ', '+')}"
-            return
-        if inputs.get("url"):
-            return
-        if query:
-            inputs["url"] = f"https://www.google.com/search?q={query.replace(' ', '+')}"
-
-    def _extract_search_query(self, message: str) -> str:
-        match = re.search(r"search(?: for)?\\s+(.+)$", message, re.IGNORECASE)
-        if not match:
-            return ""
-        query = match.group(1).strip()
-        query = re.sub(r"\\s+(?:in|on)\\s+(?:opera|chrome|edge|firefox)\\b.*$", "", query, flags=re.IGNORECASE)
-        return query.strip(" .")
-
-    def _memory(self, operation: str, inputs: Mapping[str, Any], *, original_message: str) -> Mapping[str, Any]:
-        assert self.memory is not None
-        key = str(inputs.get("key") or "discord:user")
-        if operation in {"remember", "store"}:
-            value = {"text": str(inputs.get("value") or original_message)}
-            self.memory.propose_update(key, value)
-            return {"remembered": key, "value": value}
-        if operation in {"show", "read"}:
-            return {"key": key, "value": self.memory.read(key)}
-        if operation == "forget":
-            self.memory.propose_update(key, {"forgotten": True})
-            return {"forgotten": key}
-        raise ValueError(f"unsupported memory operation: {operation}")
-
-    def _scheduler(self, operation: str, inputs: Mapping[str, Any]) -> str:
-        if operation == "pause":
-            return self.worker.pause()
-        if operation == "resume":
-            return self.worker.resume()
-        if operation in {"schedule", "recurring_check", "create_recurring_schedule", "set_recurring_schedule"}:
-            return self.worker.schedule(str(inputs.get("schedule") or inputs.get("text") or inputs.get("request") or ""))
-        raise ValueError(f"unsupported scheduler operation: {operation}")
+    def _normalize_planned_tool(self, tool: str) -> str:
+        normalized = str(tool or "").strip().lower()
+        if normalized in {"", "general_ai", "runtime"}:
+            return normalized or "general_ai"
+        tokens = {part for part in re.split(r"[^a-z0-9_.]+", normalized) if part}
+        if "runtime" in tokens:
+            return "runtime"
+        if "general_ai" in tokens:
+            return "general_ai"
+        return normalized
 
     def _final_response(self, message: str, plan: Mapping[str, Any], observations: list[dict[str, Any]]) -> str:
+        runtime_owned = self._runtime_owned_response(plan, observations)
+        if runtime_owned is not None:
+            return runtime_owned
         browser_response = self._browser_response(observations)
         if browser_response:
             return browser_response
@@ -414,154 +226,76 @@ class DiscordAIWorker:
 
     def _fallback_response(self, observations: list[dict[str, Any]]) -> str:
         if not observations:
-            return "I could not produce a response because OpenClaw did not return a plan."
-        lines = ["I ran the requested workflow:"]
+            return "Stage: planning\nReason: OpenClaw did not return a runtime plan.\nSuggested action: try the request again after checking the worker model/provider."
+        lines = ["Requested workflow executed:"]
         for item in observations:
             status = "ok" if item["success"] else "failed"
             lines.append(f"- {item['tool']}.{item['operation']}: {status}")
         return "\n".join(lines)
 
-    def _browser_response(self, observations: list[dict[str, Any]]) -> str:
+    def _runtime_owned_response(self, plan: Mapping[str, Any], observations: list[dict[str, Any]]) -> str | None:
+        if not self._runtime_owns_response(plan, observations):
+            return None
+        messages: list[str] = []
         for item in observations:
-            if item.get("tool") != "browser" or not item.get("success"):
+            if item.get("tool") != "runtime":
                 continue
             output = item.get("output")
-            if not isinstance(output, Mapping):
+            if isinstance(output, str):
+                messages.append(output)
                 continue
-            data = output.get("output")
+            if isinstance(output, Mapping) and "error" in output:
+                messages.append(
+                    "Stage: runtime execution\n"
+                    f"Reason: {output['error']}\n"
+                    "Suggested action: retry the command after the worker finishes its current filesystem or queue operation."
+                )
+        if not messages:
+            return None
+        return "\n\n".join(messages)
+
+    def _runtime_owns_response(self, plan: Mapping[str, Any], observations: list[dict[str, Any]]) -> bool:
+        if not observations:
+            return False
+        runtime_observations = [item for item in observations if item.get("tool") == "runtime"]
+        if not runtime_observations:
+            return False
+        actions = plan.get("actions", [])
+        planned_tools = {
+            self._normalize_planned_tool(str(action.get("tool") or "general_ai"))
+            for action in actions
+            if isinstance(action, Mapping)
+        }
+        return bool(planned_tools) and planned_tools <= {"runtime"}
+
+    def _browser_response(self, observations: list[dict[str, Any]]) -> str:
+        for item in observations:
+            if item.get("tool") != "runtime" or not item.get("success"):
+                continue
+            output = item.get("output")
+            if not isinstance(output, str):
+                continue
+            try:
+                payload = json.loads(output)
+            except json.JSONDecodeError:
+                continue
+            data = payload.get("output")
             if not isinstance(data, Mapping):
                 continue
-            titles = data.get("top_video_titles")
-            if isinstance(titles, list) and titles:
-                lines = ["Top visible YouTube video titles:"]
-                lines.extend(f"{index}. {title}" for index, title in enumerate(titles[:3], start=1))
-                return "\n".join(lines)
-            note = data.get("note")
-            if note:
-                return str(note)
-            excerpt = str(data.get("visible_text_excerpt") or "").strip()
+            excerpt = json.dumps(data, indent=2, sort_keys=True, default=str)
             if excerpt:
                 return excerpt[:1200]
         return ""
 
-    def _tool_context(self):
-        _, config = self.loader.load()
-        repository = config.repositories[0] if config.repositories else None
-        repo_ref = RepositoryRef(
-            provider="github",
-            owner=repository.owner if repository else "local",
-            name=repository.name if repository else "workspace",
-            default_branch=repository.default_branch if repository else config.default_branch,
-        )
-        issue_ref = IssueRef(provider="discord", repository=repo_ref.full_name, issue_number=0, title="Discord request")
-        return self.runtime.create_context(issue=issue_ref, repository=repo_ref)
-
-    def _browser_action(self, operation: str, inputs: Mapping[str, Any]) -> str:
-        operation_name = operation.lower().replace("-", "_")
-        if operation_name in {"open", "open_url", "navigate", "search", "open_and_read", "open_read", "read_homepage", "browse_and_read", "search_and_read"}:
-            if operation == "search" and "url" not in inputs:
-                query = str(inputs.get("query") or "")
-                if isinstance(inputs, dict):
-                    inputs["url"] = f"https://www.google.com/search?q={query.replace(' ', '+')}"
-            return "open_url"
-        if operation_name in {"read", "summarize", "read_visible_text"}:
-            return "read_visible_text"
-        if operation_name in {"screenshot", "take_screenshot"}:
-            return "take_screenshot"
-        return operation
-
-    def _youtube_video_titles(self, links_result: Mapping[str, Any], text_result: Mapping[str, Any]) -> list[str]:
-        links = (((links_result.get("output") or {}).get("data") or {}).get("links") or ())
-        titles: list[str] = []
-        seen: set[str] = set()
-        for link in links:
-            if not isinstance(link, Mapping):
-                continue
-            href = str(link.get("href") or "")
-            text = self._clean_video_title(str(link.get("text") or link.get("title") or ""))
-            if "watch" not in href or not text or text in seen:
-                continue
-            seen.add(text)
-            titles.append(text)
-        if titles:
-            return titles
-        visible = self._visible_text_excerpt(text_result, limit=4000)
-        fallback: list[str] = []
-        for line in visible.splitlines():
-            title = self._clean_video_title(line)
-            if title and title not in seen:
-                seen.add(title)
-                fallback.append(title)
-        return fallback
-
-    def _youtube_dom_video_titles(self, page: Any) -> list[str]:
-        selectors = [
-            "ytd-rich-item-renderer #video-title",
-            "ytd-video-renderer #video-title",
-            "a#video-title",
-            "a#video-title-link",
-        ]
-        titles: list[str] = []
-        seen: set[str] = set()
-        for selector in selectors:
-            try:
-                values = page.eval_on_selector_all(
-                    selector,
-                    "(els) => els.map((el) => (el.getAttribute('title') || el.innerText || el.textContent || '').trim())",
-                )
-            except Exception:
-                continue
-            for value in values:
-                title = self._clean_video_title(str(value))
-                if title and title not in seen:
-                    seen.add(title)
-                    titles.append(title)
-            if titles:
-                return titles
-        return titles
-
-    def _clean_video_title(self, value: str) -> str:
-        text = " ".join(value.split())
-        if not text or len(text) < 4:
-            return ""
-        lowered = text.lower()
-        blocked = {
-            "youtube",
-            "home",
-            "shorts",
-            "subscriptions",
-            "library",
-            "history",
-            "sign in",
-            "search",
-            "notifications",
-            "skip navigation",
-            "try searching to get started",
-            "start watching videos to help us build a feed of videos that you'll love.",
-        }
-        if lowered in blocked or lowered.endswith(" views") or lowered in {"new", "live", "watch"}:
-            return ""
-        if re.fullmatch(r"\d{1,2}:\d{2}(?::\d{2})?", lowered):
-            return ""
-        return text[:180]
-
-    def _visible_text_excerpt(self, text_result: Mapping[str, Any], *, limit: int = 1800) -> str:
-        value = (((text_result.get("output") or {}).get("data") or {}).get("value") or "")
-        return str(value).strip()[:limit]
-
-    def _requested_count(self, message: str, *, default: int) -> int:
-        match = re.search(r"top\s+(\\d+)", message, re.IGNORECASE)
-        if not match:
-            return default
-        return max(1, min(10, int(match.group(1))))
-
-    def _issue_number(self, inputs: Mapping[str, Any], message: str) -> int:
-        if inputs.get("issue_number"):
-            return int(inputs["issue_number"])
-        match = re.search(r"#(\d+)|issue\s+(\d+)", message, re.IGNORECASE)
-        if not match:
-            raise ValueError("issue number is required")
-        return int(next(value for value in match.groups() if value))
+    def _planning_error_response(self, exc: RuntimeError) -> str:
+        detail = str(exc)
+        if _looks_like_google_quota_error(detail):
+            return (
+                "OpenClaw planning is hitting the currently selected Google Gemini quota limit. "
+                "This Discord bot uses OpenClaw, and OpenClaw is still pointed at Google right now. "
+                "Set `WORKER_MODEL=openai/gpt-5.4` in `.env` and make sure OpenClaw is authenticated with OpenAI/Codex, then restart the bot."
+            )
+        return f"OpenClaw is currently unavailable, so I cannot execute that Discord request yet. {detail}"
 
     def _audit_decision(self, message: str, observation: Mapping[str, Any], *, user_id: str | None, channel_id: str | None) -> None:
         if self.audit_logger is None:
@@ -596,5 +330,12 @@ def _json_object(text: str) -> dict[str, Any]:
     return data
 
 
-def _env_bool(name: str) -> bool:
-    return os.environ.get(name, "").lower() in {"1", "true", "yes", "on"}
+def _looks_like_google_quota_error(detail: str) -> bool:
+    normalized = detail.lower()
+    return (
+        "provider \"google\"" in normalized
+        or "gemini" in normalized
+        or "quota exceeded" in normalized
+        or "resource_exhausted" in normalized
+        or "429" in normalized and "google" in normalized
+    )

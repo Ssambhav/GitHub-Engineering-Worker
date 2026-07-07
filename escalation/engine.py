@@ -19,6 +19,7 @@ class EscalationEngine:
         reasons: list[str] = []
         retry_count = int(evidence.get("retry_count", 0))
         failure_count = int(evidence.get("failure_count", 0))
+        failure_reason = str(evidence.get("failure_reason", "")).strip()
         if retry_count > self.rules.max_retries:
             reasons.append("maximum retries exceeded")
         if confidence.overall < self.rules.minimum_confidence:
@@ -31,8 +32,10 @@ class EscalationEngine:
             reasons.append("repository corruption detected")
         if self.rules.escalate_on_provider_unavailable and evidence.get("provider_unavailable"):
             reasons.append("AI provider unavailable")
-        if evidence.get("unknown_failure"):
-            reasons.append("unknown failure")
+        if failure_reason:
+            reasons.append(failure_reason)
+        elif evidence.get("unknown_failure"):
+            reasons.append("unclassified failure requires investigation")
         return EscalationReport(
             should_escalate=bool(reasons),
             reasons=tuple(reasons),

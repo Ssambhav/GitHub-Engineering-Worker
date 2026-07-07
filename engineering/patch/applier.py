@@ -22,9 +22,26 @@ class PatchApplier:
             patch_path = Path(handle.name)
         backups: list[Path] = []
         try:
-            check = subprocess.run(["git", "apply", "--check", str(patch_path)], cwd=repository_path, capture_output=True, text=True)
+            apply_args = ["git", "apply", str(patch_path)]
+            check_commands = (
+                (["git", "apply", "--check", str(patch_path)], ["git", "apply", str(patch_path)]),
+                (["git", "apply", "--check", "--recount", str(patch_path)], ["git", "apply", "--recount", str(patch_path)]),
+                (
+                    ["git", "apply", "--check", "--recount", "--ignore-whitespace", str(patch_path)],
+                    ["git", "apply", "--recount", "--ignore-whitespace", str(patch_path)],
+                ),
+            )
+            check = subprocess.run(check_commands[0][0], cwd=repository_path, capture_output=True, text=True)
             if check.returncode != 0:
-                return PatchApplicationResult(False, dry_run, files, errors=(check.stderr.strip(),))
+                selected_apply = None
+                for check_command, candidate_apply in check_commands[1:]:
+                    fallback_check = subprocess.run(check_command, cwd=repository_path, capture_output=True, text=True)
+                    if fallback_check.returncode == 0:
+                        selected_apply = candidate_apply
+                        break
+                if selected_apply is None:
+                    return PatchApplicationResult(False, dry_run, files, errors=(check.stderr.strip(),))
+                apply_args = selected_apply
             if dry_run:
                 return PatchApplicationResult(True, True, files)
             for file_name in files:
@@ -33,11 +50,13 @@ class PatchApplier:
                     backup = source.with_suffix(source.suffix + ".gew.bak")
                     shutil.copy2(source, backup)
                     backups.append(backup)
-            apply_result = subprocess.run(["git", "apply", str(patch_path)], cwd=repository_path, capture_output=True, text=True)
+            apply_result = subprocess.run(apply_args, cwd=repository_path, capture_output=True, text=True)
             if apply_result.returncode != 0:
                 if atomic:
                     self.rollback(backups)
                 return PatchApplicationResult(False, False, files, backups=tuple(backups), errors=(apply_result.stderr.strip(),))
+            for backup in backups:
+                backup.unlink(missing_ok=True)
             return PatchApplicationResult(True, False, files, backups=tuple(backups))
         finally:
             patch_path.unlink(missing_ok=True)

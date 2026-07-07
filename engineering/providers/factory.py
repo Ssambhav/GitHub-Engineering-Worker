@@ -1,16 +1,14 @@
-"""Provider factory with environment-aware fallback."""
+"""Provider factory constrained to OpenClaw runtime defaults."""
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from typing import Mapping
 
 from engineering.configuration import EngineeringConfiguration
 from engineering.interfaces import AIProvider
 from engineering.providers.mock import MockProvider
-from engineering.providers.openai import OpenAIProvider
-from engineering.providers.openrouter import OpenRouterProvider
+from engineering.providers.openclaw import OpenClawCapabilityDetector, OpenClawProvider
 from engineering.providers.registry import ProviderRegistry
 
 
@@ -22,19 +20,26 @@ class ProviderFactory:
     environment: Mapping[str, str] | None = None
 
     def build_registry(self) -> ProviderRegistry:
-        env = self.environment or os.environ
         registry = ProviderRegistry()
         registry.register(MockProvider())
-        if env.get(self.config.openai_api_key_env):
-            registry.register(OpenAIProvider(api_key=env[self.config.openai_api_key_env], model=self.config.model))
-        if env.get(self.config.openrouter_api_key_env):
-            registry.register(OpenRouterProvider(api_key=env[self.config.openrouter_api_key_env], model=self.config.model))
+        openclaw_detection = OpenClawCapabilityDetector(
+            cli=self.config.openclaw_cli,
+            timeout_seconds=min(self.config.openclaw_timeout_seconds, 30),
+        ).detect()
+        if openclaw_detection.callable and openclaw_detection.configured:
+            registry.register(
+                OpenClawProvider(
+                    cli=self.config.openclaw_cli,
+                    model=self.config.model,
+                    timeout_seconds=self.config.openclaw_timeout_seconds,
+                    retries=self.config.openclaw_retries,
+                    thinking=self.config.openclaw_thinking,
+                )
+            )
         return registry
 
     def select(self) -> AIProvider:
         registry = self.build_registry()
-        if self.config.provider == "auto":
-            for name in ("openai", "openrouter", "codex", "mock"):
-                if name in registry.names():
-                    return registry.get(name)
-        return registry.get(self.config.provider)
+        if self.config.provider == "mock":
+            return registry.get("mock")
+        return registry.get("openclaw")

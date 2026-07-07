@@ -72,9 +72,11 @@ class RepositoryOperations:
     def push_branch(self, path: Path, branch: str, *, remote: str = "origin", dry_run: bool = False) -> None:
         """Push a branch to a remote."""
 
-        args = ["push", "-u", remote, branch]
         if dry_run:
-            args.insert(1, "--dry-run")
+            self.validate_remote(path, remote)
+            _run(path, ["rev-parse", "--verify", branch], CommitException)
+            return
+        args = ["push", "-u", remote, branch]
         _run(path, args, CommitException)
 
     def rollback_last_commit(self, path: Path, *, keep_changes: bool = True) -> None:

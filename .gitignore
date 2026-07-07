@@ -36,6 +36,7 @@ runtime/cache/*
 runtime/tmp/*
 runtime/sandbox/*
 runtime/artifacts/*
+runtime/browser_profiles/*
 !runtime/**/README.md
 *.tmp
 *.bak

@@ -7,6 +7,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from confidence.models import ConfidenceThresholds
+from discord import DiscordBotConfiguration
 from escalation.models import EscalationRules
 from notifications.models import NotificationType
 from worker.models import WorkerRepository
@@ -32,14 +33,15 @@ class WorkerDecisionConfiguration:
     escalation_rules: EscalationRules = field(default_factory=EscalationRules)
     discord_enabled: bool = False
     discord_webhook: str | None = None
+    discord_bot: DiscordBotConfiguration = field(default_factory=DiscordBotConfiguration)
     notification_types: tuple[NotificationType, ...] = tuple(NotificationType)
     auto_create_pr: bool = True
     auto_push: bool = True
     auto_commit: bool = True
     auto_cleanup: bool = False
     continue_on_failure: bool = True
-    confidence_threshold: float = 75.0
-    run_tests: bool = True
+    confidence_threshold: float = 0.0
+    run_tests: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +57,13 @@ class WorkerConfiguration:
     branch_naming: str = "gew/issue-{issue_number}-{slug}"
     provider: str = "auto"
     model: str | None = None
+    openclaw_cli: str = "openclaw"
+    openclaw_agent_id: str = "main"
+    openclaw_agent_mode: str = "agent"
+    openclaw_agent_fallback_enabled: bool = True
+    openclaw_timeout_seconds: int = 180
+    openclaw_retries: int = 1
+    openclaw_thinking: str | None = None
     max_retries: int = 3
     max_concurrent_workers: int = 1
     queue_persistence: Path = Path("states/worker/queue.json")

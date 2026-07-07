@@ -32,6 +32,28 @@ class ProcessedIssueStore:
         with self._lock:
             return tuple(sorted(self._processed))
 
+    def remove(self, issue_key: str) -> bool:
+        with self._lock:
+            if issue_key not in self._processed:
+                return False
+            del self._processed[issue_key]
+            self._save()
+            return True
+
+    def clear(self) -> tuple[str, ...]:
+        with self._lock:
+            cleared = tuple(sorted(self._processed))
+            self._processed = {}
+            self._save()
+            return cleared
+
+    def status_for(self, issue_key: str) -> str | None:
+        with self._lock:
+            data = self._processed.get(issue_key)
+            if data is None:
+                return None
+            return str(data.get("status") or "")
+
     def _load(self) -> dict[str, dict[str, str]]:
         if not self.path.exists():
             return {}
@@ -74,6 +96,7 @@ class GitHubIssueWatcher:
                     title=issue.title,
                     url=issue.html_url,
                     labels=issue.labels,
+                    metadata={"body": issue.body or "", "comments": issue.comments, "author": issue.user_login or ""},
                 )
                 if self.should_skip(worker_issue.key):
                     continue

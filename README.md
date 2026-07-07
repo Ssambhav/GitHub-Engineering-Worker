@@ -1,6 +1,6 @@
 # GitHub Engineering Worker
 
-GitHub Engineering Worker is an autonomous OpenClaw-based engineering worker for GitHub Issues. It watches configured repositories, detects open issues, prepares a local workspace, analyzes the codebase, builds an AI prompt, generates and validates a patch, runs tests, decides whether to retry or proceed, creates a feature branch, commits, pushes, opens a pull request, records audit evidence, generates an engineering report, and notifies developers through Discord.
+GitHub Engineering Worker is an autonomous OpenClaw-based engineering worker for GitHub Issues. It watches configured repositories, detects open issues, prepares a local workspace, reads the GitHub issue, creates a working branch, launches OpenClaw Agent to inspect and modify the repository, inspects the resulting Git working tree, commits and pushes repository changes, opens a pull request, records audit evidence, generates an engineering report, and notifies developers through Discord.
 
 The worker is designed as a small engineering organization: runtime orchestration coordinates bounded subsystems, and each subsystem owns one responsibility. Configuration decides how autonomous it should be.
 
@@ -30,7 +30,7 @@ Core subsystems:
 - `worker/`: daemon, watcher, queue, scheduler, CLI, end-to-end controller, Git workflow.
 - `engineering/`: repository analysis, prompt building, provider calls, patch validation/application, tests.
 - `github/`: GitHub REST client, workspace management, branch, commit, and pull request services.
-- `confidence/`: weighted confidence estimation and decision recommendations.
+- `confidence/`: scoring and reporting support that does not block pull request creation.
 - `audit/`: structured JSONL audit trail.
 - `reports/`: typed engineering report generation.
 - `escalation/`: escalation rules for unsafe or low-confidence work.
@@ -44,10 +44,9 @@ Core subsystems:
 - Duplicate issue prevention and processed issue history.
 - Public repository dry-run support without a GitHub token.
 - AI provider fallback to the deterministic mock provider when no AI key is configured.
-- Patch validation and optional patch application.
-- Test detection and execution.
-- Confidence-driven decisioning.
-- Retry and escalation paths.
+- OpenClaw Agent-first repository engineering.
+- Optional test metadata capture when explicitly enabled.
+- Retry and escalation when the agent cannot determine a fix or makes no repository changes.
 - Feature branch creation, commit, push, and pull request creation.
 - Dry-run pull request creation when GitHub credentials are unavailable.
 - Structured audit logging.
@@ -84,9 +83,18 @@ Minimum environment for a live repository:
 GITHUB_OWNER=your-org
 GITHUB_REPOSITORY=your-repo
 GITHUB_TOKEN=ghp_...
-OPENAI_API_KEY=sk-...
 DISCORD_WEBHOOK=https://discord.com/api/webhooks/...
 ```
+
+If your OpenClaw install is already authenticated with OpenAI/Codex OAuth, the Discord worker can use that directly and does not require a separate Gemini API key or `OPENAI_API_KEY`.
+
+To force the Discord bot away from a previously selected Gemini default, set:
+
+```bash
+WORKER_MODEL=openai/gpt-5.4
+```
+
+Then restart the bot so the OpenClaw infer path uses the OpenAI/Codex-backed model explicitly instead of inheriting the last selected provider.
 
 For multiple repositories:
 
@@ -153,12 +161,11 @@ worker logs
 5. Skip closed, processed, duplicate, or in-progress issues.
 6. Clone or refresh the repository workspace.
 7. Create a feature branch.
-8. Run the engineering pipeline.
-9. Validate and apply patch.
-10. Run tests.
-11. Calculate confidence.
-12. Decide: retry, escalate, or create a PR.
-13. Commit, push, and create a pull request when thresholds pass.
+8. Launch OpenClaw Agent.
+9. Let the agent inspect and modify the repository.
+10. Inspect the Git working tree.
+11. If source files changed, commit, push, and create a pull request.
+12. If the agent cannot determine a fix or makes no repository changes, escalate with a clear reason.
 14. Persist audit logs and engineering reports.
 15. Send optional Discord notification.
 16. Sleep until the next schedule.
@@ -182,7 +189,7 @@ Target repositories should:
 - Be cloneable by the configured GitHub token or publicly cloneable for dry runs.
 - Have a valid default branch.
 - Allow feature branch pushes for live PR creation.
-- Include tests or build metadata when test execution is expected.
+- Permit feature branch pushes for autonomous pull request creation.
 - Be safe for automated patch generation and review.
 
 The worker never commits directly to the default branch.
@@ -199,6 +206,8 @@ DISCORD_WEBHOOK=https://discord.com/api/webhooks/...
 ```
 
 Notification types include worker started, issue detected, issue solved, pull request created, retry started, retry failed, escalation, worker error, and health warning.
+
+The interactive Discord AI worker uses `OpenClawProvider`, which calls `openclaw infer model run` and follows the active OpenClaw auth/model selection. In this workspace, that means the selected provider can be your Codex/OpenAI OAuth login instead of a Gemini API key.
 
 ## Engineering Pipeline
 
