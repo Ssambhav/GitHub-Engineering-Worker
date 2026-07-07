@@ -571,22 +571,6 @@ Pull Request
 Discord Summary
 ```
 
----
-
-# 🤝 Contributing
-
-Contributions are welcome.
-
-Areas of interest include:
-
-- Engineering reasoning
-- Agent orchestration
-- Tool integrations
-- GitHub automation
-- Memory systems
-- Testing
-- Runtime improvements
-- Documentation
 
 Please open an Issue before submitting large architectural changes.
 
