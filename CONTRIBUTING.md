@@ -1,18 +1,39 @@
-# Contributing
+# 🤝 Contributing
 
-GitHub Engineering Worker is currently a foundation-only repository.
+Thank you for your interest in contributing to **GitHub Engineering Worker**!
 
-## Scope
+Contributions of all sizes are welcome, including bug fixes, new features, documentation improvements, performance optimizations, and engineering ideas.
 
-Contributions should preserve the separation between agents, tools, workflows, policies, memory, state, runtime, and documentation.
+## Getting Started
 
-## Expectations
+1. Fork the repository.
+2. Create a new branch for your changes.
+3. Make your improvements.
+4. Test your changes.
+5. Submit a Pull Request with a clear description.
 
-- Do not add business logic without an accepted design.
-- Keep agent, workflow, and tool contracts narrow and auditable.
-- Document new directories with a local README.
-- Avoid committing secrets, generated runtime state, logs, or cache files.
+## Pull Request Guidelines
 
-## Review
+Please ensure your Pull Request:
 
-Changes should explain the architectural boundary they affect and include documentation updates when behavior or structure changes.
+- Focuses on a single feature or fix.
+- Includes clear commit messages.
+- Follows the existing project structure and coding style.
+- Does not introduce unrelated changes.
+- Includes documentation updates when necessary.
+
+## Reporting Issues
+
+If you discover a bug or have a feature request, please open a GitHub Issue with:
+
+- A clear description
+- Steps to reproduce (if applicable)
+- Expected behavior
+- Actual behavior
+- Relevant logs or screenshots
+
+## Questions & Discussions
+
+Ideas, suggestions, and discussions are always welcome. If you're unsure where to start, open an Issue before beginning large architectural changes.
+
+Thank you for helping improve GitHub Engineering Worker! 🚀
