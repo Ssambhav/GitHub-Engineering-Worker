@@ -15,8 +15,10 @@ from tools.implementations.github_operations import (
 )
 from tools.implementations.repository_metadata import RepositoryMetadataTool
 from tools.implementations.repository_search import RepositorySearchTool
+from browser.tools import BrowserAutomationTool
 
 __all__ = [
+    "BrowserAutomationTool",
     "DiffGenerationTool",
     "DirectoryTraversalTool",
     "FileReaderTool",

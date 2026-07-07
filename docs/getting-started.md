@@ -28,7 +28,7 @@ Place your OpenClaw agent configuration within the `.openclaw/` directory. A bas
 ```yaml
 agents:
   github-engineering-worker:
-    model: google/gemini-2.5-flash # Or your preferred model
+    model: openai/gpt-5.4 # Uses your active OpenClaw/Codex-authenticated model by default
     # Further agent-specific configurations
 
 plugins:
@@ -38,6 +38,7 @@ plugins:
 ```
 
 **Important:** Always use environment variables for sensitive information like API tokens.
+If you already authenticated OpenClaw with Codex/OpenAI OAuth, you do not need a Gemini API key for the Discord worker.
 
 ## 3. Configure Project Settings
 

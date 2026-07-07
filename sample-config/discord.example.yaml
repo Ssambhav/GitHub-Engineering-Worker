@@ -1,9 +1,24 @@
 discord:
-  enabled: false
-  webhook_env: DISCORD_WEBHOOK
+  enabled: true
+  guild_id: ${DISCORD_GUILD_ID:-1523066948483682465}
+  token_env: DISCORD_BOT_TOKEN
+  auto_reconnect: true
+  slash_commands_enabled: true
   channels:
-    worker_events: "#engineering-worker"
-    escalations: "#engineering-escalations"
+    worker_status: ${DISCORD_CHANNEL_WORKER_STATUS}
+    worker_activity: ${DISCORD_CHANNEL_WORKER_ACTIVITY}
+    worker_success: ${DISCORD_CHANNEL_WORKER_SUCCESS}
+    developer_escalations: ${DISCORD_CHANNEL_DEVELOPER_ESCALATIONS}
+    engineering_reports: ${DISCORD_CHANNEL_ENGINEERING_REPORTS}
+    worker_logs: ${DISCORD_CHANNEL_WORKER_LOGS}
+    metrics: ${DISCORD_CHANNEL_METRICS}
+    commands: ${DISCORD_CHANNEL_COMMANDS}
+  categories:
+    worker_operations: "🤖 Worker Operations"
+    engineering: "👨‍💻 Engineering"
+    monitoring: "📊 Monitoring"
+    commands: "💬 Commands"
+    admin: "🔒 Admin"
   notifications:
     worker_started: true
     issue_detected: true

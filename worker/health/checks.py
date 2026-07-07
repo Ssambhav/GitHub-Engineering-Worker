@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from engineering.providers import OpenClawCapabilityDetector
 from github.client import GitHubClient
 from worker.configuration import WorkerConfiguration
 
@@ -42,17 +43,33 @@ class WorkerHealthMonitor:
     def github_connectivity_check(self) -> HealthCheckResult:
         if self.github_client is None:
             return HealthCheckResult("github", False, "GitHub client is not configured")
+        if not self.github_client.config.token:
+            return HealthCheckResult(
+                "github",
+                False,
+                f"GitHub token is not configured; set {self.github_client.config.token_env} in the environment or repository .env",
+            )
         try:
             ok = self.github_client.validate_credentials()
         except Exception as exc:
-            return HealthCheckResult("github", False, str(exc))
-        return HealthCheckResult("github", ok, "GitHub credentials are valid" if ok else "GitHub token is not configured")
+            return HealthCheckResult(
+                "github",
+                False,
+                f"GitHub token was detected in {self.github_client.config.token_env}, but connectivity validation failed: {exc}",
+            )
+        return HealthCheckResult("github", ok, "GitHub token detected and credentials are valid")
 
     def provider_availability_check(self) -> HealthCheckResult:
-        provider = self.config.provider
-        if provider == "auto":
-            return HealthCheckResult("provider", True, "provider auto-selection enabled")
-        return HealthCheckResult("provider", True, f"provider configured: {provider}")
+        if self.config.provider == "mock":
+            return HealthCheckResult("provider", True, "mock provider configured for test mode")
+        capability = OpenClawCapabilityDetector().detect()
+        if capability.callable and capability.configured:
+            return HealthCheckResult(
+                "provider",
+                True,
+                f"OpenClaw provider available via {capability.interface}; selected={capability.selected_provider}",
+            )
+        return HealthCheckResult("provider", False, capability.reason)
 
     def summary(self) -> str:
         checks = self.startup_validation()

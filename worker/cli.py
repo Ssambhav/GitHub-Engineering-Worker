@@ -6,6 +6,7 @@ import argparse
 import json
 from pathlib import Path
 
+from runtime.configuration.environment import load_environment
 from worker.configuration import ScheduleMode, WorkerConfigurationLoader
 from worker.daemon import WorkerDaemon
 from worker.daemon.daemon import read_status
@@ -13,6 +14,7 @@ from worker.models import WorkerIssue, WorkerPaths
 
 
 def main(argv: list[str] | None = None) -> int:
+    load_environment()
     parser = argparse.ArgumentParser(prog="worker")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("run")

@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-import os
 from datetime import timedelta
 from pathlib import Path
 from typing import Mapping
 
 from confidence.models import ConfidenceThresholds
+from discord import DiscordBotConfiguration, DiscordChannelPurpose, DiscordChannelRoute
 from escalation.models import EscalationRules
 from notifications.models import NotificationType
 from runtime.configuration import RuntimeConfiguration, RuntimeConfigurationProvider
+from runtime.configuration.environment import environment_with_dotenv
 from worker.configuration.models import ScheduleMode, WorkerConfiguration, WorkerDecisionConfiguration
 from worker.models import WorkerPaths, WorkerRepository
 
@@ -24,8 +25,8 @@ class WorkerConfigurationLoader:
         *,
         environment: Mapping[str, str] | None = None,
     ) -> None:
-        self.runtime_provider = runtime_provider or RuntimeConfigurationProvider()
-        self.environment = environment or os.environ
+        self.environment = environment_with_dotenv(environment)
+        self.runtime_provider = runtime_provider or RuntimeConfigurationProvider(environment=self.environment)
 
     def load(self) -> tuple[RuntimeConfiguration, WorkerConfiguration]:
         runtime_config = self.runtime_provider.load()
@@ -43,8 +44,15 @@ class WorkerConfigurationLoader:
             workspace=runtime_config.openclaw.workspace,
             default_branch=runtime_config.github.default_base_branch,
             branch_naming=runtime_config.github.branch_naming_template,
-            provider=self.environment.get("WORKER_PROVIDER", "auto"),
-            model=self.environment.get("WORKER_MODEL"),
+            provider="openclaw",
+            model=self.environment.get("WORKER_MODEL") or self.environment.get("OPENCLAW_MODEL"),
+            openclaw_cli=self.environment.get("OPENCLAW_CLI", "openclaw"),
+            openclaw_agent_id=self.environment.get("OPENCLAW_AGENT_ID", "main"),
+            openclaw_agent_mode=self.environment.get("OPENCLAW_AGENT_MODE", "agent"),
+            openclaw_agent_fallback_enabled=_env_bool(self.environment.get("OPENCLAW_AGENT_FALLBACK_ENABLED"), default=True),
+            openclaw_timeout_seconds=int(self.environment.get("OPENCLAW_PROVIDER_TIMEOUT_SECONDS", "180")),
+            openclaw_retries=int(self.environment.get("OPENCLAW_PROVIDER_RETRIES", "1")),
+            openclaw_thinking=self.environment.get("OPENCLAW_PROVIDER_THINKING"),
             max_retries=runtime_config.execution.max_retry_attempts,
             max_concurrent_workers=runtime_config.execution.max_parallel_issues,
             queue_persistence=paths.queue_file,
@@ -71,14 +79,15 @@ class WorkerConfigurationLoader:
             ),
             discord_enabled=_env_bool(self.environment.get("DISCORD_ENABLED"), default=False),
             discord_webhook=self.environment.get("DISCORD_WEBHOOK"),
+            discord_bot=_discord_bot_configuration(self.environment),
             notification_types=tuple(NotificationType),
             auto_create_pr=_env_bool(self.environment.get("WORKER_AUTO_CREATE_PR"), default=True),
             auto_push=_env_bool(self.environment.get("WORKER_AUTO_PUSH"), default=True),
             auto_commit=_env_bool(self.environment.get("WORKER_AUTO_COMMIT"), default=True),
             auto_cleanup=_env_bool(self.environment.get("WORKER_AUTO_CLEANUP"), default=False),
             continue_on_failure=_env_bool(self.environment.get("WORKER_CONTINUE_ON_FAILURE"), default=True),
-            confidence_threshold=float(self.environment.get("WORKER_CONFIDENCE_THRESHOLD", "75")),
-            run_tests=_env_bool(self.environment.get("WORKER_RUN_TESTS"), default=True),
+            confidence_threshold=float(self.environment.get("WORKER_CONFIDENCE_THRESHOLD", "0")),
+            run_tests=_env_bool(self.environment.get("WORKER_RUN_TESTS"), default=False),
         )
 
     def _repositories(self, runtime_config: RuntimeConfiguration) -> tuple[WorkerRepository, ...]:
@@ -113,3 +122,55 @@ def _env_bool(value: str | None, *, default: bool) -> bool:
     if value is None:
         return default
     return value.lower() in {"1", "true", "yes", "on"}
+
+
+def _discord_bot_configuration(environment: Mapping[str, str]) -> DiscordBotConfiguration:
+    return DiscordBotConfiguration(
+        enabled=_env_bool(environment.get("DISCORD_ENABLED"), default=False),
+        guild_id=environment.get("DISCORD_GUILD_ID", "1523066948483682465"),
+        token_env=environment.get("DISCORD_BOT_TOKEN_ENV", "DISCORD_BOT_TOKEN"),
+        auto_reconnect=_env_bool(environment.get("DISCORD_AUTO_RECONNECT"), default=True),
+        slash_commands_enabled=_env_bool(environment.get("DISCORD_SLASH_COMMANDS_ENABLED"), default=True),
+        channel_routes=(
+            DiscordChannelRoute(
+                channel=environment.get("DISCORD_CHANNEL_WORKER_STATUS", ""),
+                purposes=(DiscordChannelPurpose.STARTUP, DiscordChannelPurpose.SHUTDOWN, DiscordChannelPurpose.HEARTBEAT),
+            ),
+            DiscordChannelRoute(
+                channel=environment.get("DISCORD_CHANNEL_WORKER_ACTIVITY", ""),
+                purposes=(
+                    DiscordChannelPurpose.ISSUE_DETECTION,
+                    DiscordChannelPurpose.REPOSITORY_CLONING,
+                    DiscordChannelPurpose.PIPELINE_EXECUTION,
+                ),
+            ),
+            DiscordChannelRoute(
+                channel=environment.get("DISCORD_CHANNEL_WORKER_SUCCESS", ""),
+                purposes=(DiscordChannelPurpose.ISSUE_SOLVED, DiscordChannelPurpose.COMMIT, DiscordChannelPurpose.PULL_REQUEST),
+            ),
+            DiscordChannelRoute(
+                channel=environment.get("DISCORD_CHANNEL_DEVELOPER_ESCALATIONS", ""),
+                purposes=(
+                    DiscordChannelPurpose.RETRIES_EXHAUSTED,
+                    DiscordChannelPurpose.LOW_CONFIDENCE,
+                    DiscordChannelPurpose.MANUAL_INTERVENTION,
+                ),
+            ),
+            DiscordChannelRoute(
+                channel=environment.get("DISCORD_CHANNEL_ENGINEERING_REPORTS", ""),
+                purposes=(DiscordChannelPurpose.ENGINEERING_REPORTS, DiscordChannelPurpose.AUDIT_SUMMARIES),
+            ),
+            DiscordChannelRoute(
+                channel=environment.get("DISCORD_CHANNEL_WORKER_LOGS", ""),
+                purposes=(DiscordChannelPurpose.ERRORS, DiscordChannelPurpose.EXCEPTIONS),
+            ),
+            DiscordChannelRoute(
+                channel=environment.get("DISCORD_CHANNEL_METRICS", ""),
+                purposes=(DiscordChannelPurpose.QUEUE, DiscordChannelPurpose.PERFORMANCE, DiscordChannelPurpose.SUCCESS_RATE),
+            ),
+            DiscordChannelRoute(
+                channel=environment.get("DISCORD_CHANNEL_COMMANDS", ""),
+                purposes=(DiscordChannelPurpose.SLASH_COMMANDS,),
+            ),
+        ),
+    )

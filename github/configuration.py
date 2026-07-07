@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
+
+from runtime.configuration.environment import environment_with_dotenv
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,7 +38,7 @@ class GitHubIntegrationConfig:
         cleanup_policy: str = "keep",
         rate_limit_threshold: int = 25,
     ) -> "GitHubIntegrationConfig":
-        env = environment or os.environ
+        env = environment_with_dotenv(environment)
         return cls(
             token_env=token_env,
             token=env.get(token_env),

@@ -37,6 +37,22 @@ class IssueService:
 
         return self.client.list_labels(owner, repo)
 
+    def create_issue(
+        self,
+        owner: str,
+        repo: str,
+        *,
+        title: str,
+        body: str,
+        labels: tuple[str, ...] = (),
+        dry_run: bool = False,
+    ) -> GitHubIssue:
+        """Create an issue or return a dry-run issue when remote writes are disabled."""
+
+        issue = self.client.create_issue(owner, repo, title=title, body=body, labels=labels, dry_run=dry_run)
+        self.validate_issue(issue) if not dry_run else None
+        return issue
+
     def validate_issue(self, issue: GitHubIssue) -> None:
         """Reject pull requests or invalid issue numbers when an issue is required."""
 

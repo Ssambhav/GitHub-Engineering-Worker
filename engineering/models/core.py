@@ -20,6 +20,19 @@ class EngineeringIssue:
 
 
 @dataclass(frozen=True, slots=True)
+class IssueUnderstanding:
+    """Structured issue understanding extracted before repository search."""
+
+    category: str
+    problem: str
+    expected_behavior: str
+    actual_behavior: str
+    acceptance_criteria: tuple[str, ...]
+    search_terms: tuple[str, ...]
+    confidence: float
+
+
+@dataclass(frozen=True, slots=True)
 class CandidateFile:
     """Ranked repository file candidate."""
 
@@ -27,6 +40,8 @@ class CandidateFile:
     score: float
     reasons: tuple[str, ...]
     symbols: tuple[str, ...] = ()
+    category_hits: tuple[str, ...] = ()
+    search_passes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,11 +59,16 @@ class FileSnippet:
 class RepositoryAnalysis:
     """Structured repository analysis used for prompting and review."""
 
+    issue_category: str
     summary: str
     affected_components: tuple[str, ...]
     possible_root_cause: str
+    root_cause_evidence: tuple[str, ...]
     related_modules: tuple[str, ...]
     dependency_summary: str
+    investigation_queries: tuple[str, ...]
+    irrelevant_files: tuple[str, ...]
+    files_safe_to_modify: tuple[str, ...]
     confidence: float
 
 
@@ -57,6 +77,7 @@ class EngineeringContext:
     """Structured context sent to an AI provider."""
 
     issue: EngineeringIssue
+    understanding: IssueUnderstanding
     repository_path: Path
     repository_summary: str
     candidates: tuple[CandidateFile, ...]
@@ -102,6 +123,26 @@ class PatchResponse:
     modified_files: tuple[str, ...]
     reasoning_summary: str
     provider_name: str
+    raw_text: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionMetadata:
+    """Execution-mode evidence captured for the worker report."""
+
+    mode: str
+    selected_reason: str
+    selected_model: str | None = None
+    selected_provider: str | None = None
+    command: tuple[str, ...] = ()
+    subprocess: tuple[str, ...] = ()
+    fallback_reason: str | None = None
+    raw_response_excerpt: str = ""
+    stage_exit_code: int | None = None
+    stage_stdout: str = ""
+    stage_stderr: str = ""
+    stage_exception: str | None = None
+    stage_returned_value: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,6 +155,7 @@ class PatchValidationResult:
     modified_files: tuple[str, ...] = ()
     additions: int = 0
     deletions: int = 0
+    rejected_files: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,6 +190,36 @@ class TestResult:
 
 
 @dataclass(frozen=True, slots=True)
+class VerificationAction:
+    """One executed verification step."""
+
+    action: str
+    success: bool
+    url: str = ""
+    page_title: str = ""
+    details: str = ""
+    screenshot_paths: tuple[str, ...] = ()
+    errors: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class VerificationResult:
+    """Structured browser verification outcome."""
+
+    attempted: bool
+    passed: bool
+    summary: str
+    target_url: str | None = None
+    issue_reproduced: bool = False
+    expected_behavior_verified: bool = False
+    visible_text_excerpt: str = ""
+    screenshot_paths: tuple[str, ...] = ()
+    actions: tuple[VerificationAction, ...] = ()
+    warnings: tuple[str, ...] = ()
+    errors: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class EngineeringResult:
     """Final result returned by the execution pipeline."""
 
@@ -162,3 +234,5 @@ class EngineeringResult:
     errors: tuple[str, ...] = ()
     engineering_notes: tuple[str, ...] = ()
     recommended_next_step: str = "review"
+    verification: VerificationResult | None = None
+    execution_metadata: ExecutionMetadata | None = None

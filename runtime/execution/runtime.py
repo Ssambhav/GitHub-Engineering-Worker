@@ -84,6 +84,17 @@ class ExecutionRuntime:
         )
         return orchestrator.run(context)
 
+    def run_agentic_goal(self, *, issue: IssueRef, repository: RepositoryRef, goal) -> object:
+        """Run the agentic decision engine for a goal using registered runtime services."""
+
+        if self.configuration is None:
+            self.start()
+        context = self.create_context(issue=issue, repository=repository)
+        from decision import AgenticDecisionEngine
+
+        engine = AgenticDecisionEngine(registry=self.registry, tool_executor=self.tool_executor)
+        return engine.run(goal, context)
+
     def _register_core_agents(self) -> None:
         """Register built-in agents once."""
 

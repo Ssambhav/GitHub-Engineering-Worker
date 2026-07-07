@@ -1,6 +1,6 @@
 # GitHub Engineering Worker Agent Architecture
 
-GitHub Engineering Worker is an autonomous OpenClaw-based software engineering platform. It owns the complete lifecycle of a GitHub Issue from intake through repository understanding, implementation planning, validation, recovery, escalation, and engineering review.
+GitHub Engineering Worker is an autonomous OpenClaw-based software engineering platform. It owns the complete lifecycle of a GitHub Issue from intake through repository preparation, OpenClaw Agent execution, Git branch/PR handoff, escalation, and engineering review.
 
 This file is the canonical agent architecture contract. It is intentionally declarative: it defines agent responsibilities, communication boundaries, lifecycle expectations, confidence standards, and extension rules. It does not implement tools, workflows, retries, memory, state machines, or prompts.
 
@@ -44,15 +44,15 @@ Optional extension agents may be introduced for specialized domains such as secu
 
 ## Shared Workflow Model
 
-The system follows an Observe -> Think -> Plan -> Execute -> Validate -> Learn -> Decide loop:
+The system follows an Observe -> Prepare -> Execute -> Inspect -> Decide -> Report loop:
 
 1. Observe: gather issue, repository, state, memory, and execution context.
 2. Think: understand intent, constraints, likely ownership, and risk.
-3. Plan: produce a bounded implementation plan and validation strategy.
-4. Execute: generate and apply narrowly scoped changes.
-5. Validate: run tests, inspect diffs, and verify acceptance criteria.
+3. Execute: launch OpenClaw Agent on a fresh working branch and allow repository inspection/modification.
+4. Inspect: review the resulting Git working tree and changed files.
+5. Decide: if source files changed, commit/push/open a pull request; otherwise escalate with a clear reason.
 6. Learn: record reusable findings, failures, and recovery knowledge.
-7. Decide: finish, retry, gather more information, or escalate.
+7. Report: persist outcome artifacts and notify Discord.
 
 Only the orchestrator chooses transitions between phases. Specialist agents produce artifacts and confidence assessments for the orchestrator to evaluate.
 

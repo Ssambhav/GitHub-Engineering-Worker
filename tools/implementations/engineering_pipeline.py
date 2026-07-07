@@ -19,7 +19,7 @@ class EngineeringPipelineTool(EngineeringTool):
         identifier="engineering.pipeline",
         name="Engineering Pipeline Tool",
         version="1.0.0",
-        description="Run repository search, context building, provider patch generation, validation, and dry-run application.",
+        description="Run OpenClaw Agent mode engineering with infer fallback when technically necessary.",
         capabilities=ToolCapabilities(("engineering.pipeline", "engineering.solve", "patch.generate")),
         side_effects=("read", "write", "execute", "network"),
         idempotency="conditionally_idempotent",
@@ -32,12 +32,17 @@ class EngineeringPipelineTool(EngineeringTool):
     def execute(self, request: ToolRequest, context: ToolContext, prepared: Mapping[str, Any]) -> ToolResult:
         runtime_config = getattr(context.runtime_services, "configuration", None)
         config = EngineeringConfiguration(
-            provider=str(request.inputs.get("provider", "auto")),
-            model=request.inputs.get("model"),
+            openclaw_cli=str(request.inputs.get("openclaw_cli", "openclaw")),
+            openclaw_agent_id=str(request.inputs.get("openclaw_agent_id", "main")),
+            openclaw_agent_mode=str(request.inputs.get("openclaw_agent_mode", "agent")),
+            openclaw_agent_fallback_enabled=bool(request.inputs.get("openclaw_agent_fallback_enabled", True)),
+            openclaw_timeout_seconds=int(request.inputs.get("openclaw_timeout_seconds", 180)),
+            openclaw_retries=int(request.inputs.get("openclaw_retries", 1)),
+            openclaw_thinking=request.inputs.get("openclaw_thinking"),
             workspace_root=Path(str(getattr(getattr(runtime_config, "openclaw", None), "workspace", "."))),
             max_candidate_files=int(request.inputs.get("max_candidate_files", 12)),
             max_files_to_read=int(request.inputs.get("max_files_to_read", 6)),
-            max_context_bytes=int(request.inputs.get("max_context_bytes", 80_000)),
+            max_context_bytes=int(request.inputs.get("max_context_bytes", 30_000)),
         )
         issue = EngineeringIssue(
             repository=str(request.inputs["repository"]),
@@ -54,22 +59,33 @@ class EngineeringPipelineTool(EngineeringTool):
             dry_run=bool(request.inputs.get("dry_run", context.execution.metadata.dry_run)),
             run_tests=bool(request.inputs.get("run_tests", False)),
         )
-        return ToolResult.ok(
-            metadata=self.metadata,
-            structured_output={
-                "issue": f"{result.issue.repository}#{result.issue.number}",
-                "repository": result.repository,
-                "patch_summary": result.patch_summary,
-                "files_modified": list(result.files_modified),
-                "tests_executed": [list(command.command) for command in result.tests_executed],
-                "test_results": [
-                    {"command": list(item.command), "exit_code": item.exit_code, "passed": item.passed}
-                    for item in result.test_results
-                ],
-                "confidence": result.confidence,
-                "warnings": list(result.warnings),
-                "errors": list(result.errors),
-                "engineering_notes": list(result.engineering_notes),
-                "recommended_next_step": result.recommended_next_step,
-            },
-        )
+        output = {
+            "issue": f"{result.issue.repository}#{result.issue.number}",
+            "repository": result.repository,
+            "patch_summary": result.patch_summary,
+            "files_modified": list(result.files_modified),
+            "tests_executed": [list(command.command) for command in result.tests_executed],
+            "test_results": [
+                {"command": list(item.command), "exit_code": item.exit_code, "passed": item.passed}
+                for item in result.test_results
+            ],
+            "confidence": result.confidence,
+            "warnings": list(result.warnings),
+            "errors": list(result.errors),
+            "engineering_notes": list(result.engineering_notes),
+            "recommended_next_step": result.recommended_next_step,
+            "execution_mode": result.execution_metadata.mode if result.execution_metadata else None,
+            "execution_model": result.execution_metadata.selected_model if result.execution_metadata else None,
+            "execution_provider": result.execution_metadata.selected_provider if result.execution_metadata else None,
+            "execution_command": list(result.execution_metadata.command) if result.execution_metadata else [],
+            "execution_subprocess": list(result.execution_metadata.subprocess) if result.execution_metadata else [],
+            "execution_reason": result.execution_metadata.selected_reason if result.execution_metadata else None,
+            "execution_fallback_reason": result.execution_metadata.fallback_reason if result.execution_metadata else None,
+        }
+        if result.errors:
+            return ToolResult.failure(
+                metadata=self.metadata,
+                error="; ".join(result.errors),
+                structured_output=output,
+            )
+        return ToolResult.ok(metadata=self.metadata, structured_output=output)

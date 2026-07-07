@@ -9,7 +9,12 @@ from engineering.models.core import PatchResponse
 
 def parse_patch_response(text: str, *, provider_name: str) -> PatchResponse:
     diff_match = re.search(r"```diff\s*(.*?)```", text, re.DOTALL)
-    diff = diff_match.group(1).strip() + "\n" if diff_match else text.strip() + "\n"
+    if diff_match:
+        diff = diff_match.group(1).strip() + "\n"
+    elif re.search(r"^(diff --git|--- |\+\+\+ |@@ )", text, re.MULTILINE):
+        diff = text.strip() + "\n"
+    else:
+        diff = ""
     files = tuple(dict.fromkeys(re.findall(r"^\+\+\+ b/(.+)$", diff, re.MULTILINE)))
     confidence_match = re.search(r"Confidence:\s*([0-9.]+)", text, re.IGNORECASE)
     confidence = float(confidence_match.group(1)) if confidence_match else 0.5
@@ -22,4 +27,5 @@ def parse_patch_response(text: str, *, provider_name: str) -> PatchResponse:
         modified_files=files,
         reasoning_summary=(reasoning_match.group(1).strip() if reasoning_match else ""),
         provider_name=provider_name,
+        raw_text=text,
     )

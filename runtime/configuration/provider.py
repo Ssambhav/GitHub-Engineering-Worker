@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import re
 from pathlib import Path
 from typing import Any, Mapping
@@ -17,6 +16,7 @@ from runtime.configuration.settings import (
 )
 from runtime.exceptions import ConfigurationException
 from runtime.models.common import immutable_mapping
+from runtime.configuration.environment import environment_with_dotenv
 
 _ENV_PATTERN = re.compile(r"^\$\{(?P<name>[A-Za-z_][A-Za-z0-9_]*)(?::-(?P<default>.*))?}$")
 
@@ -37,7 +37,7 @@ class RuntimeConfigurationProvider:
         environment: Mapping[str, str] | None = None,
     ) -> None:
         self.config_path = Path(config_path)
-        self.environment = environment or os.environ
+        self.environment = environment_with_dotenv(environment)
 
     def load(self) -> RuntimeConfiguration:
         data = self._load_file() if self.config_path.exists() else {}
